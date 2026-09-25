@@ -98,41 +98,48 @@ Os valores abaixo foram equilibrados por simulação: os nove personagens têm p
 
 ## 5. Mecânicas
 
-### 5.1 Loja
+Como **Combo Tactics** é um RPG Tático de turnos focado em duelos de arena 1v1 sem fases de exploração de mapas, o jogo **não possui** armadilhas físicas, barreiras espalhadas ou caixas destrutíveis pelo cenário (todo o dano vem das batalhas). No entanto, há diversos sistemas mecânicos, elementos de ambiente e regras que funcionam de forma independente dos personagens e governam o mundo do jogo.
 
-A loja fica disponível no menu fora de combate e é onde o jogador gasta as moedas que acumula nas batalhas (100 por vitória) para comprar itens e evoluir os personagens. 
-- Os itens são consumíveis usados como uma das três ações do turno, e o catálogo é Kit Médico, Remédio (contra efeitos negativos), Poção de Ataque e Defesa (+10%).
-- A evolução é individual por personagem e soma 3% ao valor base de HP, Ataque, Defesa ou Velocidade, com no máximo 5 evoluções por atributo (teto de +15%).
+### 5.1 Loja (Economia e Meta-jogo)
 
-### 5.2 Efeitos Positivos e Negativos
+A loja fica disponível no menu fora de combate e é onde o jogador gasta as moedas que acumula nas batalhas para comprar itens e evoluir os personagens. 
+- **Sistema de Moedas:** Vitória = 100 moedas; Derrota = 50 moedas; Ganhar o Torneio (Boss) = 500 moedas.
+- Os itens são consumíveis usados como uma das três ações do turno (ocupam o turno inteiro para serem utilizados), e o catálogo é Kit Médico (cura HP do ativo), Remédio (limpa debuffs e efeitos negativos), Poção de Ataque e Defesa (+10%).
+- A evolução é individual por personagem e soma 3% ao valor base de HP, Ataque, Defesa ou Velocidade, com no máximo 5 evoluções por atributo (teto de +15% de atributos brutos).
 
-Os efeitos são aplicados por ataques especiais e duram por 3 turnos. 
-- Efeitos negativos incluem Chamas, Afogamento e Veneno, que causam dano contínuo ao fim de cada turno, e podem ser removidos com remédios.
-- Efeitos positivos incluem regeneração, que devolve HP a cada turno, e aumentos temporários de atributo. 
+### 5.2 Efeitos Positivos e Negativos (AoT - Ao Redor do Tempo)
+
+Os efeitos são aplicados por ataques especiais e duram por exatos 3 turnos. 
+- Efeitos negativos (DoTs - Damage over Time) incluem Chamas, Afogamento e Veneno, que causam dano contínuo sempre ao fim de cada turno, e podem ser removidos com remédios.
+- Efeitos positivos (HoTs - Heal over Time) incluem regeneração, que devolve HP passivamente a cada turno, e aumentos temporários de atributo. 
 
 > Os efeitos acompanham o personagem mesmo quando ele está fora de batalha.
 
-### 5.3 Stamina
+### 5.3 Stamina e Gestão de Turnos
 
-Cada jogador tem uma barra de stamina que, quando cheia, libera o ataque especial. A barra carrega ao causar dano, ao sofrer dano e ao defender com sucesso.
+A base estrutural do combate onde as regras de ações são regidas. O jogador só pode realizar **uma ação** por turno: (1) Atacar, (2) Usar Item ou (3) Trocar de Personagem ativo.
+Cada jogador tem uma barra de stamina neutra que, quando cheia (100%), libera o ataque especial. A barra carrega baseada na interatividade do combate sob três condições: ao causar dano ao inimigo, ao sofrer dano do inimigo e ao defender com sucesso (ativando a janela de defesa).
 
 ### 5.4 Ataque Especial
 
-Cada personagem tem três ataques: dois sempre disponíveis, e o especial, mais forte, que exige a barra de stamina cheia.
+Cada personagem tem três ataques: dois sempre disponíveis para o kit padrão, e o especial, muito mais forte, que exige a barra de stamina cheia.
 
-### 5.5 Desvio e Contra-ataque
+### 5.5 Desvio e Contra-ataque (Janela de Resposta)
 
-Quando o personagem do jogador é alvo de um ataque, abre-se uma janela de tempo em que ele pode clicar no momento certo para se defender. Acertar a janela resulta em desvio (dano anulado) ou contra-ataque (davolve o ataque recebido).
+Uma mecânica interativa (QTE - Quick Time Event) que quebra o ritmo passivo dos turnos convencionais. Quando o personagem do jogador é alvo de um ataque, abre-se uma curta janela de tempo em que ele pode clicar no momento certo para reagir ativamente ao invés de apenas receber dano. Acertar a janela resulta em:
+- **Desvio:** O dano do ataque é 100% anulado.
+- **Contra-ataque:** O alvo não apenas anula o dano, mas devolve o golpe no oponente.
 
-### 5.6 Efeitos de Rodadas
+### 5.6 Efeitos de Rodadas (Mudança de Arena)
 
-A cada 3 rodadas, um sorteio no estilo cassino altera o ambiente da arena, que passa a favorecer alguns personagens e prejudicar outros. O efeito do ambiente é aplicado apenas na rodada sorteada, com +-10% no dano.
+Esta é a principal mecânica de "hazard" do jogo. A arena é um ambiente dinâmico que afeta os lutadores de ambos os lados da batalha.
+A cada 3 rodadas, um sorteio no estilo roleta de cassino altera completamente o ambiente da arena, que passa a favorecer alguns personagens e prejudicar outros. O efeito do ambiente aplica um modificador de +-10% no dano.
 
 Ambientes e seus efeitos:
 
 | Ambiente | Favorece | Prejudica |
 | --- | --- | --- |
-| Mar | Personagens de Água | Personagens de Fogo |
-| Vulcão | Personagens de Fogo | Personagens de Planta |
-| Floresta | Personagens de Planta | Personagens de Água |
-| Lua | Personagens de baixa Velocidade | Personagens de alta Velocidade |
+| Mar | Personagens de Água (+10% de dano) | Personagens de Fogo  (-10% de dano) |
+| Vulcão | Personagens de Fogo (+10% de dano) | Personagens de Planta (-10% de dano) |
+| Floresta | Personagens de Planta (+10% de dano) | Personagens de Água (-10% de dano) |
+| Lua (Baixa gravidade) | Personagens de baixa Velocidade | Personagens de alta Velocidade |

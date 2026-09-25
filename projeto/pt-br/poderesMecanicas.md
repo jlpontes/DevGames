@@ -41,11 +41,17 @@ As condições de status duram por exatos **3 turnos**. Uma mecânica muito impo
 *   **Benefícios Contínuos (HoTs - Heal over Time):** Status como *Regeneração*, que cura passivamente o personagem a cada fim de turno.
 
 ## 6. O Cálculo de Combate (Efetividade e Defesa)
-O motor matemático por trás do jogo, atuando como o verdadeiro "juiz" das partidas, já que todos os personagens possuem poder de combate (status) equivalente de fábrica.
+O motor matemático por trás do jogo, atuando como o verdadeiro "juiz" das partidas, já que todos os personagens possuem poder de combate (status) equivalente de fábrica. A Velocidade não entra no cálculo de dano, apenas define quem age primeiro no turno.
+*   **Ciclos de Vantagem:**
+    *   **Elementos:** Fogo → Planta → Água → Fogo.
+    *   **Classes:** Guerreiro → Mago → Tanque → Guerreiro.
 *   **Corte da Defesa:** Cada ponto numérico em Defesa reduz **0,5%** do dano recebido. O limite de absorção ("teto de armadura") é de **50% de corte de dano** (alcançado com 100 pontos de Defesa).
 *   **Multiplicadores de Vantagem:**
     *   Vantagem Simples (Classe **ou** Elemento): +30% de Dano Causado / -30% Dano Recebido.
     *   Vantagem Dupla (Classe **e** Elemento): +50% de Dano Causado / -50% Dano Recebido.
+
+## 6.5 Estrutura de Habilidades
+Cada personagem possui um kit de três ataques: dois sempre disponíveis para uso comum e um **Ataque Especial**, mais forte, que só pode ser utilizado quando a barra de Stamina atinge 100%.
 
 ## 7. Economia e Loja (Meta-jogo)
 Mecânica que ocorre fora da arena de combate, incentivando o ciclo de gameplay.
