@@ -50,20 +50,21 @@ This document designs the system as a whole: what it must do, how data flows, wh
 - **Team:** 3–5 devs. **Time:** about 4 weeks.
 - **Multiplayer is local only:** one device, one keyboard and mouse.
 
-### 1.4 Assumptions
+### 1.4 Rule decisions
 
-These fill gaps in the GDD. Each one is a default until the team decides otherwise (see [ARCHITECTURE.md §7](ARCHITECTURE.md#7-open-design-questions-gdd-gaps-that-block-code)).
+The gaps in the GDD were closed as rules **R1–R10** in [GDD §5.7](../GDD.md#57-rule-clarifications). This design follows them; the most relevant ones here:
 
-| # | Assumption |
+| Rule | Summary |
 |---|---|
-| A1 | Turn model: both sides choose an action, then they resolve in Speed order. A switch always resolves first. Speed ties are broken by a seeded coin flip. |
-| A2 | Mixed advantages multiply: attacker bonus × defender reduction (e.g. 1.3 × 0.7 = 0.91). |
-| A3 | Arena effect lasts until the next draw. The first 3 rounds are neutral. |
-| A4 | QTE: perfect timing = counter, good timing = dodge, otherwise miss. A counter hits back with the defender's skill 1. |
-| A5 | Stamina is per player: +20 dealing damage, +15 taking damage, +25 successful reaction. It resets to 0 after the special. |
-| A6 | Up to 3 items per battle, taken from the inventory. Used items are consumed. |
-| A7 | Moon: Spd < 50 favoured, Spd ≥ 75 penalised. |
-| A8 | PvP has a "Fair mode" toggle: base stats and a fixed item kit. |
+| R1 | Mixed advantages multiply: attacker bonus × defender reduction (e.g. 1.3 × 0.7 = 0.91). |
+| R2 | Both sides choose, then resolve in Speed order. Switches first; ties broken by a seeded coin flip. |
+| R3 | QTE: perfect = counter, good = dodge, else miss. The counter uses the defender's skill 1 and cannot be reacted to. |
+| R4 | Every battle starts in an arena (campaign: opponent's home arena; other modes: random). The arena lasts until the next draw. |
+| R5 | Moon: Spd < 50 favoured, Spd ≥ 70 penalised. |
+| R6 | PvP Fair Mode by default: base stats and a fixed item kit. |
+| R7 | Stamina per player: +20 dealing damage, +15 taking damage, +25 successful reaction; resets to 0 after the special. |
+| R8 | Up to 3 items per battle, consumed when used. |
+| R10 | Campaign Fire → Water → Plant → Boss; trainer stats +0 / +7 / +12%. |
 
 ---
 
@@ -101,12 +102,12 @@ The whole system is one static web build. There is no server side.
 │ ProfileService · StoreService              │ │ DamageCalculator · EffectivenessResolver│
 │ CampaignService · StatsResolver            │ │ EffectSystem · StaminaSystem            │
 │ BattleLauncher ────── builds BattleSetup ──┼─▶ ArenaDraw · TurnOrder · Rng (seeded)    │
-│ ISaveStore ─▶ PlayerPrefsSaveStore         │ │ Controllers: Human · UtilityAI · Random │
+│ ISaveStore ─▶ PlayerPrefsSaveStore         │ │ Controllers: Human · RuleBasedAI · Random│
 └───────────▲────────────────────────────────┘ └──────▲──────────────────────────────────┘
             │ reads (by id)                            │ immutable specs
 ┌───────────┴──────────────────── CONTENT (ScriptableObjects) ───────┴──────────────────┐
 │ ContentDatabase: CharacterDef · SkillDef · EffectDef · ItemDef · ArenaDef ·           │
-│                  OpponentDef · AIWeights · EffectivenessTable · EconomyConfig         │
+│                  OpponentDef · AIProfile · EffectivenessTable · EconomyConfig         │
 └───────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -120,7 +121,8 @@ CampaignMap ──select stage──▶ CampaignService.CanPlay(stage)?
 TeamSelect ──team + items──▶ BattleLauncher.Build(setup)
    │   ├─ StatsResolver: base stats × upgrades      (Profile)
    │   ├─ ContentDatabase → FighterSpec/SkillSpec    (immutable)
-   │   ├─ OpponentDef → AI team + UtilityAIController(weights)
+   │   ├─ OpponentDef → AI team (+ stage stat bonus) + RuleBasedAIController(AIProfile)
+   │   ├─ starting arena = OpponentDef.homeArena
    │   └─ seed = random int  (logged for bug reports)
 Battle scene ──▶ BattleDirector runs the engine loop (Flow B)
    │ BattleEnded(winner)
@@ -136,7 +138,7 @@ Result screen ──▶ CampaignMap
 BattleDirector                 BattleEngine (core)                Controllers
      │  Pending = Actions             │                                │
      │──RequestAction(side 0)─────────┼───────────────────────────────▶│ Human: ActionMenu
-     │──RequestAction(side 1)─────────┼───────────────────────────────▶│ AI: score & pick
+     │──RequestAction(side 1)─────────┼───────────────────────────────▶│ AI: priority rules
      │◀──────────── ICommand × 2 ─────┼────────────────────────────────│
      │──Submit(cmds)─────────────────▶│ order by Speed (switch first)  │
      │◀─ events [SkillUsed, ReactionRequested]                         │
@@ -237,7 +239,8 @@ SkillDef ───── id, power, isSpecial, effect? ──▶ EffectDef, effe
 EffectDef ──── id, kind{DoT,HoT,StatMod}, value, stat?, turns=3, cleansable
 ItemDef ────── id, kind{Heal,Cleanse,AtkUp,DefUp}, value, price
 ArenaDef ───── id{Sea,Volcano,Forest,Moon}, rule{Element|SpeedBand}, favoured, penalised, background
-OpponentDef ── id, name, team[1..3] ──▶ CharacterDef, aiWeights ──▶ AIWeights, homeArena, reward
+OpponentDef ── id, name, team[1..3] ──▶ CharacterDef, aiProfile ──▶ AIProfile, homeArena, statBonus, items, reward
+AIProfile ──── survivalHpPct, switchChance, dotTurnsBeforeCleanse, qteChance, counterShare, mistakeChance
 ```
 
 **Runtime battle state (core, mutable during a battle only)**
@@ -245,7 +248,7 @@ OpponentDef ── id, name, team[1..3] ──▶ CharacterDef, aiWeights ──
 ```
 BattleState
  ├── round : int
- ├── arena : ArenaId?            (null = neutral)
+ ├── arena : ArenaId             (set at battle start, R4)
  ├── rng   : Rng(seed)
  └── sides[2] : Side
        ├── team[1..3] : Fighter
@@ -254,7 +257,7 @@ BattleState
        │     └── effects : List<ActiveEffect{effectId, turnsLeft, value}>   ← stays when benched
        ├── activeIndex : int
        ├── stamina : int (0..100)
-       └── items : Dictionary<itemId, count>   (max 3 total, A6)
+       └── items : Dictionary<itemId, count>   (max 3 total, R8)
 ```
 
 **Persistent profile (`SaveData`, JSON)**
@@ -274,7 +277,7 @@ Rules: save files refer to content **by string id only**. Unknown ids are ignore
 
 ### 3.2 Core algorithms
 
-**Damage** (F3, A2, A3):
+**Damage** (F3, R1, R4):
 
 ```
 raw     = skill.power / 100 × Atk × atkBuffs
@@ -286,7 +289,7 @@ damage  = max(1, round(raw × adv × env × defCut))
 
 Check against the GDD's example: a Fire Mage (Atk 171) hits a Plant Tank (Def 95) with a power-100 skill. It has class and element advantage, so adv = 1.5, giving 171 × 1.5 × 0.525 = **135**. A Plant Tank attacking a Fire Mage has no advantage, and the Mage has two, so adv = 0.5, giving 63 × 0.5 × 0.925 = **29**.
 
-**Turn resolution** (F2, F4, A1):
+**Turn resolution** (F2, F4, R2):
 
 1. Both commands are collected.
 2. Order: switches first, then by effective Speed (Moon may change it), with ties broken by `rng`.
@@ -333,7 +336,7 @@ The **`BattleEvent` stream is the queue** of this system:
 | Unknown content id in save | Lookup miss | Skip the entry and log it |
 | Save write fails (quota, private mode) | Exception from `PlayerPrefs.Save()` | Show a "progress can't be saved in this browser" banner and keep playing |
 | Tab closed mid-battle | n/a | The battle is lost; the profile is unchanged because the save is only written at battle end. The resume-battle feature is deferred. |
-| AI takes too long | n/a (≤ ~100 evaluations per turn) | Not needed. Add a hard cap of 200 evaluations as a guard. |
+| AI switches back and forth forever | Same fighter switched in on consecutive turns | Guard in `RuleBasedAIController`: no switch two turns in a row ([ADR-004](adr/ADR-004-ai-approach.md)) |
 | Content authoring error (stat > 100, missing skill) | `OnValidate` + EditMode test over `ContentDatabase` | Fails the test run before it reaches a build |
 
 No retry logic is needed: the system has no network calls after the initial download, which the browser and Unity loader handle.
@@ -351,7 +354,7 @@ No retry logic is needed: the system has no network calls after the initial down
 | Hosting traffic | 30 MB × players | A static CDN (itch.io) absorbs any class-project or launch spike for free |
 | Battle length | Neutral duels: Mage vs Mage ≈ 4 hits to kill (171 × 0.875 ≈ 150 vs 560 HP); Tank vs Tank ≈ 18–23 hits (63–73 Atk vs 75–95 Def) | 3v3 ≈ 15–40 rounds. At ~6 s of animation plus ~4 s choosing per round, that is **3–7 min**. Fits the 5-min target (N5), but **Tank mirrors risk dragging**; the balance sim must report round counts. |
 | Events per round | ~8–14 | Trivial |
-| AI cost per turn | ≤ 9 own options × 9 replies (Hard look-ahead) = 81 damage evaluations | Microseconds; no frame impact |
+| AI cost per turn | 5 rule checks + at most 3 damage evaluations (best normal skill) | Microseconds; no frame impact |
 | Balance simulation | 81 matchups × 1,000 seeds × ~30 rounds ≈ 2.4 M resolutions | Seconds to a minute in an EditMode test |
 | Memory | Unity WebGL heap 256 MB initial | 10 characters × 1 atlas each (≤ 2048²) + 4 backgrounds fits |
 | Save size | < 2 KB | Far under the ~1 MB `PlayerPrefs` limit on WebGL |
@@ -389,7 +392,7 @@ No backend, so no live telemetry in the MVP. Instead:
 | Turn model | Simultaneous choice, resolved in Speed order | Strict alternation | Gives Speed a meaning (GDD §3.3); familiar from Pokémon | Hot-seat needs a "pass the device" screen |
 | QTE placement | UI measures timing, core receives the result | Core simulates timing | Core stays deterministic and frame-rate independent | The AI's "timing" is just a probability |
 | Content | ScriptableObjects | JSON / hard-coded | Inspector tuning, asset references ([ADR-003](adr/ADR-003-data-driven-content.md)) | Content cannot be updated without a new build |
-| AI | Utility scoring | Minimax / MCTS | Good enough, cheap, tunable per opponent ([ADR-004](adr/ADR-004-ai-approach.md)) | Exploitable by expert players |
+| AI | Rule-based priority list (from the Level Design) | Utility scoring / Minimax | Matches the design team's spec; tunable per opponent through data ([ADR-004](adr/ADR-004-ai-approach.md)) | Predictable for expert players |
 | Persistence | PlayerPrefs JSON, double-buffered | Cloud backend | Zero infrastructure for a ~2 KB save ([ADR-005](adr/ADR-005-persistence.md)) | No cross-device saves; coins can be edited |
 | Save timing | Only at battle end and on store purchase | Continuous / mid-battle | Simple and consistent | Closing the tab mid-battle loses that battle |
 | Services wiring | Static `Game` accessor | DI framework (Zenject/VContainer) | Small project; less to learn | Weaker testability of the meta layer (the core is unaffected) |
@@ -402,7 +405,7 @@ No backend, so no live telemetry in the MVP. Instead:
 |---|---|
 | **Real-money coin packages** (Notebook p.10) | Move the wallet, purchases and upgrades to a **server-authoritative backend** (accounts, payment provider webhooks, receipt validation). `ISaveStore` becomes a cloud store, and the client no longer writes coins. |
 | **Online PvP** | Thanks to the deterministic core, either exchange only commands (lockstep with the seed agreed up front) or run the core on a server for authority. Add matchmaking and reconnection. The QTE needs a latency-tolerant design, such as a client-side timing result checked against a server deadline. |
-| **Betting system** (GDD key feature, not yet specified) | Needs a design pass first. If it involves coins between players, it is server-side only. |
+| **Coin-betting system** (post-MVP per GDD §6) | Needs a design pass first. If it involves coins between players, it is server-side only. |
 | More characters (> 20) or frequent balance patches | Move content to JSON or remote config so balance can change without a rebuild; consider Addressables to keep the first download small. |
 | Mobile release | Native Android/iOS builds instead of mobile WebGL; touch-friendly QTE; UI scaling. |
 | Battles routinely > 7 min | Raise skill power or lower Tank Defense, guided by the balance sim's round-count report. |

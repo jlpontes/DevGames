@@ -157,6 +157,6 @@
 
 - **Free-to-play?** Sim, o jogo é gratuito no navegador.
 - **Paga para jogar a versão completa?** Não, a campanha inteira, o multiplayer e os 9 personagens estão liberados sem pagar nada.
-- **Paga para avançar mais rápido ou desbloquear sem jogar?** Sim, há pacotes de moedas para comprar itens e evoluções.
-- **Paga para ter vantagem sobre outros jogadores?** Só de forma indireta, com a compra de itens e evoluções de atributos.
+- **Paga para avançar mais rápido ou desbloquear sem jogar?** Não no MVP. Pacotes de moedas para itens e evoluções estão previstos para depois do lançamento, quando o jogo tiver contas e um servidor para validar as compras.
+- **Paga para ter vantagem sobre outros jogadores?** Não no MVP. Se os pacotes de moedas forem adicionados, a vantagem seria indireta (itens e evoluções), e o Modo Justo do PvP local mantém as partidas com atributos base.
 - **Publicidade desbloqueável?** O jogo não tem anúncio, nem obrigatória nem opcional por recompensa. 

@@ -8,7 +8,7 @@
 - **Classificação Indicativa:** 14 anos.
 - **Modos de Jogo:** Multiplayer, Singleplayer, Player versus Player (PvP), Player vs IA.
 - **Temática Central:** Um torneio de arena/clube da luta onde o jogador gerencia e reveza uma equipe de três lutadores em combates de alto risco.
-- **Diferenciais:** Habilidades combinatórias de classe e sistema de apostas/gambling.
+- **Diferenciais:** Habilidades combinatórias de classe e sorteio de arena estilo cassino (o elemento de gambling do MVP). Um sistema de apostas com moedas está previsto para depois do MVP (ver seção 6).
 - **Referências e Competidores:** Persona, Pokémon, Baldur's Gate, Expedition 33.
 
 ## 2. Resumo da Jogabilidade
@@ -133,7 +133,7 @@ Uma mecânica interativa (QTE - Quick Time Event) que quebra o ritmo passivo dos
 ### 5.6 Efeitos de Rodadas (Mudança de Arena)
 
 Esta é a principal mecânica de "hazard" do jogo. A arena é um ambiente dinâmico que afeta os lutadores de ambos os lados da batalha.
-A cada 3 rodadas, um sorteio no estilo roleta de cassino altera completamente o ambiente da arena, que passa a favorecer alguns personagens e prejudicar outros. O efeito do ambiente aplica um modificador de +-10% no dano.
+A cada 3 rodadas, um sorteio no estilo roleta de cassino altera completamente o ambiente da arena, que passa a favorecer alguns personagens e prejudicar outros. O efeito do ambiente aplica um modificador de +-10% no dano e permanece ativo até o próximo sorteio. Toda batalha começa em uma arena: na campanha é a arena do oponente; nos outros modos, ela é sorteada.
 
 Ambientes e seus efeitos:
 
@@ -142,4 +142,31 @@ Ambientes e seus efeitos:
 | Mar | Personagens de Água (+10% de dano) | Personagens de Fogo  (-10% de dano) |
 | Vulcão | Personagens de Fogo (+10% de dano) | Personagens de Planta (-10% de dano) |
 | Floresta | Personagens de Planta (+10% de dano) | Personagens de Água (-10% de dano) |
-| Lua (Baixa gravidade) | Personagens de baixa Velocidade | Personagens de alta Velocidade |
+| Lua (Baixa gravidade) | Personagens de baixa Velocidade (< 50) | Personagens de alta Velocidade (≥ 70) |
+
+### 5.7 Esclarecimentos de Regras
+
+Decisões tomadas em 02/10/2026 para fechar lacunas que bloqueavam a implementação. Os valores numéricos são pontos de partida e podem ser ajustados após playtest.
+
+| # | Tema | Regra |
+| --- | --- | --- |
+| R1 | Vantagens mistas | Quando o atacante tem uma vantagem e o defensor tem outra, as duas se aplicam e se multiplicam. Exemplo: Guerreiro de Fogo contra Mago de Água = +30% (classe) × −30% (elemento) = 1,3 × 0,7 = **0,91** do dano. |
+| R2 | Ordem do turno | Os dois jogadores escolhem a ação e elas são resolvidas em ordem de Velocidade. Troca de personagem sempre resolve primeiro. Empate de Velocidade é decidido no sorteio. No PvP local, uma tela de "passe o aparelho" esconde a escolha do Jogador 1 do Jogador 2. |
+| R3 | Desvio x contra-ataque | Timing perfeito = **contra-ataque**, timing bom = **desvio**, fora disso o golpe acerta. O contra-ataque usa a primeira habilidade normal do defensor contra o atacante e não pode ser respondido. |
+| R4 | Duração da arena | A arena sorteada fica ativa até o próximo sorteio (a cada 3 rodadas). Toda batalha começa em uma arena (ver 5.6). |
+| R5 | Limites da Lua | Velocidade < 50 é favorecida (+10%): os três Tanques e o Mago de Planta. Velocidade ≥ 70 é prejudicada (−10%): os três Guerreiros. |
+| R6 | Justiça no PvP | O PvP local usa o **Modo Justo** por padrão: atributos base (sem evoluções da loja) e um kit fixo de 1 Kit Médico, 1 Remédio e 1 Poção de Ataque. Pode ser desligado na configuração do PvP. |
+| R7 | Stamina | Uma barra por jogador (0–100), compartilhada pela equipe. +20 ao causar dano, +15 ao sofrer dano, +25 ao desviar ou contra-atacar com sucesso. Zera depois do ataque especial. |
+| R8 | Itens na batalha | Até 3 itens por batalha, tirados do inventário e consumidos ao usar. Kit Médico cura 30% do HP máximo. Remédio remove todos os efeitos negativos. Poções de Ataque e Defesa dão +10% por 3 turnos. |
+| R9 | Boss | Um único lutador exclusivo, com cerca de 3× o HP de um personagem jogável e sem ações extras por turno. Arena de origem: Lua. |
+| R10 | Campanha | Ordem: Treinador de Fogo (Vulcão), Treinador de Água (Mar), Treinador de Planta (Floresta), Boss (Lua). A equipe de cada treinador tem os três personagens do seu elemento. Os atributos dos treinadores escalam com a fase: +0%, +7%, +12%. |
+
+## 6. Escopo do MVP
+
+| No MVP (novembro de 2026) | Depois do MVP |
+| --- | --- |
+| Campanha (4 fases), contra IA com dificuldade, PvP local | PvP online |
+| Loja com itens e evoluções comprados com moedas ganhas em batalha | Pacotes de moedas pagos (exigem contas e servidor) |
+| Sorteio de arena estilo cassino | Sistema de apostas com moedas (precisa de design próprio) |
+| Progresso salvo no navegador | Save na nuvem entre dispositivos |
+

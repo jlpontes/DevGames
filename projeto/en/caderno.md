@@ -157,6 +157,6 @@
 
 - **Free-to-play?** Yes, the game is free on the browser.
 - **Pay to play the full version?** No, the entire campaign, multiplayer, and the 9 characters are unlocked without paying anything.
-- **Pay to advance faster or unlock without playing?** Yes, there are coin packages to buy items and evolutions.
-- **Pay to have an advantage over other players?** Only indirectly, with the purchase of items and attribute evolutions.
+- **Pay to advance faster or unlock without playing?** Not in the MVP. Coin packages for items and evolutions are planned for after launch, once the game has accounts and a server to validate purchases.
+- **Pay to have an advantage over other players?** Not in the MVP. If coin packages are added later, the advantage would be indirect (items and evolutions), and local PvP's Fair Mode keeps matches on base attributes.
 - **Unlockable advertising?** The game has no ads, neither mandatory nor optional for rewards.
