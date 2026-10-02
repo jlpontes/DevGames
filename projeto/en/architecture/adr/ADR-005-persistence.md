@@ -8,7 +8,7 @@
 Persistent data is small: coins, item inventory, upgrade levels (9 characters × 4 stats), campaign progress and settings. That is well under 10 KB. The Notebook mentions paid coin packages, but the team decided on **no backend for the MVP**. The game is a free browser game; local hot-seat is the only multiplayer.
 
 ## Decision
-Serialize a versioned `SaveData` class with `JsonUtility` into one `PlayerPrefs` key, behind an `ISaveStore` interface. On WebGL, `PlayerPrefs` lives in the browser's IndexedDB. Call `PlayerPrefs.Save()` after each change (end of battle, store purchase, settings change).
+Serialize a versioned `SaveData` class with `JsonUtility` into `PlayerPrefs`, behind an `ISaveStore` interface. Writes alternate between two keys (`save_a` / `save_b`) with a counter and checksum, and loading picks the newest valid one, so an interrupted write never destroys the previous save. On WebGL, `PlayerPrefs` lives in the browser's IndexedDB. Call `PlayerPrefs.Save()` after each change (end of battle, store purchase, settings change).
 
 ```csharp
 [Serializable] class SaveData {

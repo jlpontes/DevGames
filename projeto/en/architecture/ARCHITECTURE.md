@@ -2,6 +2,7 @@
 
 **Status:** Proposed
 **Date:** 2026-10-02
+**See also:** [SYSTEM-DESIGN.md](SYSTEM-DESIGN.md) (requirements, data flows, internal contracts, data model, reliability)
 **Inputs:** [GDD](../GDD.md), [Notebook](../caderno.md), [Level Design](../leveldesign.md), [Mechanics](../poderesMecanicas.md), `fluxograma.excalidraw`, `telas.excalidraw`
 
 ## 1. Constraints
