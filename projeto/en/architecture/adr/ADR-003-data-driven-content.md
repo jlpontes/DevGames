@@ -8,7 +8,7 @@
 The game has 9 characters plus a boss, about 30 skills, 4 items, about 6 effects, 4 arenas, 4 opponents, and economy numbers. All of it will be rebalanced often in weeks 2–3. Designers and non-programmers on the team should be able to change values without touching code.
 
 ## Decision
-Author all content as **ScriptableObject assets** (`CharacterDef`, `SkillDef`, `EffectDef`, `ItemDef`, `ArenaDef`, `OpponentDef`, `EffectivenessTable`, `EconomyConfig`). A `ContentDatabase` asset lists them all. `BattleLauncher` converts them into immutable core records before a battle, so the core never touches Unity types.
+Author all content as **ScriptableObject assets** (`CharacterDef`, `SkillDef`, `EffectDef`, `ItemDef`, `ArenaDef`, `OpponentDef`, `AIProfile`, `EffectivenessTable`, `EconomyConfig`). A `ContentDatabase` asset lists them all. `BattleLauncher` converts them into immutable core records before a battle, so the core never touches Unity types.
 
 ## Options Considered
 

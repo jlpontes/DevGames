@@ -16,9 +16,9 @@ A turn-based tactical RPG for the browser. The player manages a team of 3 fighte
 | Ten-Page Notebook | [en/caderno.md](en/caderno.md) | [pt-br/caderno.md](pt-br/caderno.md) |
 | Level Design (Water trainer) | [en/leveldesign.md](en/leveldesign.md) | [pt-br/leveldesign.md](pt-br/leveldesign.md) |
 | Mechanics | [en/poderesMecanicas.md](en/poderesMecanicas.md) | [pt-br/poderesMecanicas.md](pt-br/poderesMecanicas.md) |
-| Architecture | [en/architecture/ARCHITECTURE.md](en/architecture/ARCHITECTURE.md) | — |
-| System Design | [en/architecture/SYSTEM-DESIGN.md](en/architecture/SYSTEM-DESIGN.md) | — |
-| Decision records (ADRs) | [en/architecture/adr/](en/architecture/adr/) | — |
+| Architecture | [en/architecture/ARCHITECTURE.md](en/architecture/ARCHITECTURE.md) | [pt-br/architecture/ARCHITECTURE.md](pt-br/architecture/ARCHITECTURE.md) |
+| System Design | [en/architecture/SYSTEM-DESIGN.md](en/architecture/SYSTEM-DESIGN.md) | [pt-br/architecture/SYSTEM-DESIGN.md](pt-br/architecture/SYSTEM-DESIGN.md) |
+| Decision records (ADRs) | [en/architecture/adr/](en/architecture/adr/) | [pt-br/architecture/adr/](pt-br/architecture/adr/) |
 | Next steps | — | [NEXT-STEPS.md](NEXT-STEPS.md) |
 
 Screen flow and flowchart: `telas.excalidraw` and `fluxograma.excalidraw` (open at [excalidraw.com](https://excalidraw.com)).

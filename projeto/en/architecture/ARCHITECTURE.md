@@ -141,7 +141,7 @@ interface IBattleController {
 
 **AI** ([ADR-004](adr/ADR-004-ai-approach.md)) follows the priority rules from the Level Design: survive (Medical Kit), switch for advantage, cleanse DoTs, use the special when stamina is full, otherwise attack with the best normal skill. All thresholds and chances (including QTE success: Easy 20% / Normal 50% / Hard 80%, Water trainer 40%) come from an `AIProfile` asset.
 
-**Hot-seat PvP:** both players choose in the same round (GDD R2), so P2 must not see P1's choice, so a short "Pass to Player 2" cover screen sits between the two choices. QTE keys are separate (e.g. P1 `Space`, P2 `Enter`) so it is always clear who reacts.
+**Hot-seat PvP:** both players choose in the same round (GDD R2), so P2 must not see P1's choice: a short "Pass to Player 2" cover screen sits between the two choices. QTE keys are separate (e.g. P1 `Space`, P2 `Enter`) so it is always clear who reacts.
 
 ### 3.4 Game / Meta layer (plain C#, owned by `GameRoot`)
 

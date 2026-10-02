@@ -10,9 +10,9 @@
 
 | Área | Situação |
 |---|---|
-| Design de jogo (GDD, caderno, mecânicas) | Completo. As lacunas de regra foram fechadas em [GDD §5.7](en/GDD.md#57-rule-clarifications) (R1–R10) e o escopo do MVP está em [GDD §6](en/GDD.md#6-mvp-scope) |
+| Design de jogo (GDD, caderno, mecânicas) | Completo. As lacunas de regra foram fechadas em [GDD §5.7](pt-br/GDD.md#57-esclarecimentos-de-regras) (R1–R10) e o escopo do MVP está em [GDD §6](pt-br/GDD.md#6-escopo-do-mvp) |
 | Level design | 1 de 4 fases documentada (Treinador de Água), igual em en e pt-br |
-| Arquitetura | [ARCHITECTURE.md](en/architecture/ARCHITECTURE.md), [SYSTEM-DESIGN.md](en/architecture/SYSTEM-DESIGN.md), 5 ADRs. Ainda na branch `docs/architecture` |
+| Arquitetura | [ARCHITECTURE.md](pt-br/architecture/ARCHITECTURE.md), [SYSTEM-DESIGN.md](pt-br/architecture/SYSTEM-DESIGN.md), 5 ADRs, em pt-br e en. Ainda na branch `docs/architecture` |
 | Implementação | Nada ainda: sem projeto Unity |
 | Arte e áudio | Logo, menu e 4 arenas prontos. **Faltam os 9 personagens, o Boss e todos os sons** |
 
@@ -28,6 +28,7 @@
 | Sistema de apostas listado como diferencial, mas sem design | No MVP, o elemento de gambling é o sorteio de arena. Apostas com moedas ficam para depois do MVP (GDD §1 e §6) |
 | Caderno previa pacotes de moedas pagos; a arquitetura não tem backend | Caderno p.10 atualizado: sem compras no MVP; pacotes de moedas só depois, com contas e servidor |
 | GDD (en) não tinha as recompensas de derrota e do Boss | Adicionado: vitória 100, derrota 50, Boss 500 |
+| Pasta `architecture` só existia em inglês | Traduzida para `pt-br/architecture` (ARCHITECTURE, SYSTEM-DESIGN e os 5 ADRs) |
 | Perguntas Q1–Q9 sem resposta | Respondidas como R1–R9 no GDD; o `ARCHITECTURE.md` §7 aponta para elas |
 | `projeto/README.md` era uma cópia do caderno com imagens quebradas | Virou a página inicial do projeto, com links para todos os documentos |
 
@@ -47,8 +48,8 @@
 
 ### Semana 1 (05–09/10) — Esqueleto jogável
 
-- [ ] Criar o projeto Unity com as 3 assemblies (Core / Game / UI) — [ADR-002](en/architecture/adr/ADR-002-battle-core-separation.md).
-- [ ] Escrever e **congelar** os contratos: `ICommand`, `BattleEvent`, `IBattleEngine`, `IBattleController` ([SYSTEM-DESIGN §2.4](en/architecture/SYSTEM-DESIGN.md)).
+- [ ] Criar o projeto Unity com as 3 assemblies (Core / Game / UI) — [ADR-002](pt-br/architecture/adr/ADR-002-battle-core-separation.md).
+- [ ] Escrever e **congelar** os contratos: `ICommand`, `BattleEvent`, `IBattleEngine`, `IBattleController` ([SYSTEM-DESIGN §2.4](pt-br/architecture/SYSTEM-DESIGN.md)).
 - [ ] `DamageCalculator` com testes (incluindo o exemplo do GDD: Mago de Fogo contra Tanque de Planta = 135).
 - [ ] Batalha mínima: Menu → Batalha com 2 placeholders, só ataque, `RandomController` como IA.
 - [ ] **Build WebGL publicado** (itch.io e GitHub Pages) e testado no Chrome, Firefox e Safari.
@@ -58,8 +59,8 @@
 
 - [ ] Itens, troca, efeitos (incluindo no banco), stamina e especial, QTE, sorteio de arena.
 - [ ] ScriptableObjects dos 9 personagens com os atributos do GDD §4; habilidades e efeitos.
-- [ ] `RuleBasedAIController` + os 7 `AIProfile` ([ADR-004](en/architecture/adr/ADR-004-ai-approach.md)).
-- [ ] Loja e save local ([ADR-005](en/architecture/adr/ADR-005-persistence.md)).
+- [ ] `RuleBasedAIController` + os 7 `AIProfile` ([ADR-004](pt-br/architecture/adr/ADR-004-ai-approach.md)).
+- [ ] Loja e save local ([ADR-005](pt-br/architecture/adr/ADR-005-persistence.md)).
 - [ ] **Simulação de balanceamento:** matriz de vitórias 9×9 e média de rodadas (alerta se passar de 40 rodadas: risco de Tanque contra Tanque).
 
 ### Semana 3 (19–23/10) — Conteúdo e modos
@@ -97,7 +98,6 @@
 | Preços da loja (itens e evoluções) | Semana 2 | Itens 40–60 moedas; evolução custa 50 × (nível + 1). Com 100 moedas por vitória, uma evolução custa de 1 a 5 batalhas |
 | Atributos, habilidades e arte do Boss | Semana 2 | Personagem próprio, cerca de 3× o HP (≈ 2.600), arena Lua (R9) |
 | Level design das fases de Fogo, Planta e Boss | Semana 2 | Copiar o modelo da fase de Água, mudando time, arena, bônus de atributos e `AIProfile` |
-| Tradução da pasta `architecture` para pt-br | Antes da entrega, se a disciplina exigir | — |
 | Critérios de avaliação da disciplina | Agora | Ajustar os entregáveis abaixo a eles |
 
 ---
