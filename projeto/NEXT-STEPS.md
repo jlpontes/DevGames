@@ -43,7 +43,6 @@
 - [ ] Limpeza do repositório:
   - [ ] apagar a pasta `DevGames/` na raiz (clone antigo e desatualizado, com `.git` próprio);
   - [ ] adicionar `.gitignore` (macOS + Unity) e tirar o `.DS_Store` do versionamento;
-  - [x] incluir os guias das skills (`skill/`) no repositório, em en e pt-br.
 - [ ] Definir dono de cada área (tabela da seção 3).
 
 ### Semana 1 (05–09/10) — Esqueleto jogável

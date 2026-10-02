@@ -19,7 +19,6 @@ A turn-based tactical RPG for the browser. The player manages a team of 3 fighte
 | Architecture | [en/architecture/ARCHITECTURE.md](en/architecture/ARCHITECTURE.md) | [pt-br/architecture/ARCHITECTURE.md](pt-br/architecture/ARCHITECTURE.md) |
 | System Design | [en/architecture/SYSTEM-DESIGN.md](en/architecture/SYSTEM-DESIGN.md) | [pt-br/architecture/SYSTEM-DESIGN.md](pt-br/architecture/SYSTEM-DESIGN.md) |
 | Decision records (ADRs) | [en/architecture/adr/](en/architecture/adr/) | [pt-br/architecture/adr/](pt-br/architecture/adr/) |
-| Claude Code skill guides | [en/skill/](en/skill/) | [pt-br/skill/](pt-br/skill/) |
 | Next steps | — | [NEXT-STEPS.md](NEXT-STEPS.md) |
 
 Screen flow and flowchart: `telas.excalidraw` and `fluxograma.excalidraw` (open at [excalidraw.com](https://excalidraw.com)).
