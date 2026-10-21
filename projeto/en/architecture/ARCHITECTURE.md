@@ -25,6 +25,7 @@ Three layers. Dependencies point **downward only**.
 │ PRESENTATION  (MonoBehaviours, scenes, UI, animation, audio)  │
 │  MenuUI · CampaignMapUI · TeamSelectUI · StoreUI · BattleView │
 │  HUD · ReactionWindow (QTE) · ArenaRoulette · CameraDirector  │
+│  AffinitySelectUI · StoryCardUI                               │
 └──────────────▲──────────────────────────────▲─────────────────┘
                │ calls services                │ consumes BattleEvents,
                │                               │ sends commands
@@ -40,6 +41,7 @@ Three layers. Dependencies point **downward only**.
 │ CONTENT  (ScriptableObjects — data only)                       │
 │  CharacterDef · SkillDef · ItemDef · EffectDef · ArenaDef      │
 │  OpponentDef · AIProfile · EffectivenessTable · EconomyConfig  │
+│  StoryCardDef                                                  │
 └───────────────────────────────────────────────────────────────┘
 ```
 
@@ -54,12 +56,13 @@ The central decision ([ADR-002](adr/ADR-002-battle-core-separation.md)): **the b
 
 | Asset | Fields (summary) | Count in MVP |
 |---|---|---|
-| `CharacterDef` | id, name, `Element`, `CharClass`, base HP/Atk/Def/Spd, 2 normal skills + 1 special, sprite/animator, voice clips | 9 + 1 boss |
+| `CharacterDef` | id, name, `Element` (Fire / Water / Plant; Neutral for the Boss only, GDD R9), `CharClass`, base HP/Atk/Def/Spd, 2 normal skills + 1 special, sprite/animator, voice clips | 9 + 1 boss |
 | `SkillDef` | power, `isSpecial`, target, optional `EffectDef` + chance, VFX/SFX | ~30 |
 | `EffectDef` | kind (DoT / HoT / StatMod), value, duration (default 3), `removableByMedicine` | ~6 (Flames, Drowning, Poison, Regeneration, Atk↑, Def↑) |
 | `ItemDef` | kind (Heal / Cleanse / AtkPotion / DefPotion), value, price | 4 |
 | `ArenaDef` | Sea / Volcano / Forest / Moon, favoured/penalised rule, background art | 4 |
-| `OpponentDef` | name, team (1–3 `CharacterDef`), `AIProfile`, home arena (starting arena), stat bonus (+0 / +7 / +12%), starting items, reward | 4 (Fire, Water, Plant, Boss) |
+| `OpponentDef` | name, team (1–3 `CharacterDef`), `AIProfile`, home arena (starting arena), stat bonus (+0 / +7 / +12%), starting items, reward, `StoryCardDef` shown before the stage | 4 (Fire, Water and Plant guardians, Core Guardian) |
+| `StoryCardDef` | id, text, image, moment (opening / before stage N / ending) | 6 (GDD R12) |
 | `AIProfile` | thresholds and chances for the priority rules ([ADR-004](adr/ADR-004-ai-approach.md)) | 7 (Easy, Normal, Hard + 4 opponents) |
 | `EffectivenessTable` | the two cycles (Fire→Plant→Water, Warrior→Mage→Tank), 1.3/1.5 and 0.7/0.5 multipliers | 1 |
 | `EconomyConfig` | coins (win 100 / loss 50 / boss 500), +3% per upgrade, max 5 per stat | 1 |
@@ -146,10 +149,11 @@ interface IBattleController {
 ### 3.4 Game / Meta layer (plain C#, owned by `GameRoot`)
 
 - **`GameRoot`** is a `DontDestroyOnLoad` object created in the `Boot` scene. It owns the services below and exposes them through a single static accessor (`Game.Profile`, `Game.Store`, ...). The project is too small to need a DI framework.
-- **`ProfileService`** holds coins, inventory, per-character upgrade levels (0–5 per stat), campaign progress (index of last beaten opponent) and settings.
+- **`ProfileService`** holds coins, inventory, per-character upgrade levels (0–5 per stat), campaign progress (index of last beaten opponent), the mage's affinity, the spectrum (ids of unlocked fighters) and settings. `IsUnlocked(charId)` answers whether a fighter can be picked.
 - **`StoreService`** handles `BuyItem` and `BuyUpgrade`. It validates the price, the 5-upgrade cap and the balance, then saves.
-- **`CampaignService`** covers the 4 stages (Fire, Water, Plant, Boss), stage unlocking and rewards.
+- **`CampaignService`** covers the 4 stages (Fire, Water and Plant guardians, Core Guardian), stage unlocking and rewards. `StartCampaign(affinity)` stores the affinity and puts that element's 3 fighters in the spectrum. Beating a fragment guardian adds the 3 fighters of its element to the spectrum (GDD R11). It also says which `StoryCardDef` to show before each stage and at the end (GDD R12).
 - **`StatsResolver`** computes effective stats as base × (1 + 0.03 × level). In PvP Fair Mode (default) it returns base stats (GDD R6). Campaign opponents get their stage bonus (GDD R10).
+- **`TeamSelect`** only offers fighters from the spectrum, in every mode (campaign, vs AI and local PvP). The AI's team skips this filter.
 - **`BattleLauncher`** builds a `BattleSetup` (teams, controllers, seed, starting arena, rewards) and loads the `Battle` scene. On `BattleEnded` it pays coins, updates progress and returns to the right menu.
 - **`SaveStore`** ([ADR-005](adr/ADR-005-persistence.md)) writes a versioned `SaveData` serialized with `JsonUtility` into `PlayerPrefs`. On WebGL that is stored in IndexedDB. The interface `ISaveStore` is the seam for a future cloud save and paid coin packages.
 
@@ -158,11 +162,13 @@ interface IBattleController {
 **Scenes** (from `telas.excalidraw`):
 
 ```
-Boot ─▶ MainMenu ─┬─▶ CampaignMap (Fire · Water · Plant · Final Boss) ─▶ TeamSelect ─▶ Battle
-                  ├─▶ PvP ─▶ TeamSelect (Team 1 / Team 2) ─────────────────────────▶ Battle
-                  ├─▶ vs AI (difficulty) ─▶ TeamSelect ─────────────────────────────▶ Battle
+Boot ─▶ MainMenu ─┬─▶ [no affinity yet] AffinitySelect ─▶ StoryCard (opening) ─▶ CampaignMap
+                  ├─▶ CampaignMap (Fire · Water · Plant · Core) ─▶ StoryCard (stage) ─▶ TeamSelect ─▶ Battle
+                  ├─▶ PvP ─▶ TeamSelect (Team 1 / Team 2, spectrum only) ─────────────────────────▶ Battle
+                  ├─▶ vs AI (difficulty) ─▶ TeamSelect (spectrum only) ───────────────────────────▶ Battle
                   └─▶ Store (Item Shop · Attribute Progression)
-Battle ─▶ Result screen (coins earned) ─▶ CampaignMap / MainMenu
+Battle ─▶ Result screen (coins earned, fighters unlocked) ─▶ CampaignMap / MainMenu
+Win against the Core Guardian ─▶ StoryCard (ending) ─▶ MainMenu
 ```
 
 **Battle scene components**
@@ -218,7 +224,7 @@ The assembly definitions enforce the layering: a `using UnityEngine;` inside `Co
 
 ## 7. Design questions (resolved)
 
-The nine gaps found in the GDD (Q1–Q9) were closed on 2026-10-02 and written into the GDD as rules R1–R10 in [§5.7 Rule Clarifications](../GDD.md#57-rule-clarifications). The code follows the GDD; this table only maps the old question numbers.
+The nine gaps found in the GDD (Q1–Q9) were closed on 2026-10-02 and written into the GDD as rules R1–R10 in [§5.7 Rule Clarifications](../GDD.md#57-rule-clarifications). On 2026-10-20 the Elemental Crystal story added R11 and R12 and changed R9 and R10. The code follows the GDD; this table only maps the old question numbers.
 
 | # | Question | Resolved by |
 |---|---|---|
@@ -230,8 +236,10 @@ The nine gaps found in the GDD (Q1–Q9) were closed on 2026-10-02 and written i
 | Q6 | PvP fairness | R6: Fair Mode by default |
 | Q7 | Stamina | R7: per player, +20 / +15 / +25, resets after the special |
 | Q8 | Items | R8: max 3 per battle, Med Kit 30%, potions +10% for 3 turns |
-| Q9 | Boss | R9: single fighter, ~3× HP, no extra actions, Moon arena |
-| — | Campaign order and opponent strength | R10: Fire → Water → Plant → Boss; mono-element teams; +0 / +7 / +12% |
+| Q9 | Boss | R9: Core Guardian, single neutral-element fighter, ~3× HP, no extra actions, Moon arena |
+| — | Campaign order and opponent strength | R10: Fire → Water → Plant → Core guardians; mono-element teams; +0 / +7 / +12% |
+| — | Available fighters | R11: affinity chosen at the start; the spectrum starts with that element's 3 and grows with every guardian beaten; applies to every mode |
+| — | How the story is shown | R12: text cards with an image (opening, before each stage, ending) |
 
 Still open (not blocking week 1): store prices, the Boss's stats and skills, and the level design for the Fire, Plant and Boss stages. See [NEXT-STEPS.md](../../NEXT-STEPS.md).
 

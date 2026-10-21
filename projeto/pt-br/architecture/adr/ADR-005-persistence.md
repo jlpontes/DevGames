@@ -5,10 +5,10 @@
 **Decisores:** Time de desenvolvimento
 
 ## Contexto
-Os dados persistentes são poucos: moedas, inventário de itens, níveis de evolução (9 personagens × 4 atributos), progresso da campanha e configurações. Bem menos de 10 KB. O Caderno prevê pacotes de moedas pagos para depois do lançamento, e o time decidiu **não ter backend no MVP**. O jogo é gratuito no navegador; o hot-seat local é o único multiplayer.
+Os dados persistentes são poucos: moedas, inventário de itens, níveis de evolução (9 personagens × 4 atributos), progresso da campanha, a afinidade do mago e o espectro de lutadores liberados (GDD R11), e configurações. Bem menos de 10 KB. O Caderno prevê pacotes de moedas pagos para depois do lançamento, e o time decidiu **não ter backend no MVP**. O jogo é gratuito no navegador; o hot-seat local é o único multiplayer.
 
 ## Decisão
-Serializar uma classe `SaveData` versionada com `JsonUtility` no `PlayerPrefs`, atrás de uma interface `ISaveStore`. As gravações alternam entre duas chaves (`save_a` / `save_b`) com contador e checksum, e o carregamento escolhe a mais recente válida, então uma gravação interrompida nunca destrói o save anterior. No WebGL, o `PlayerPrefs` fica no IndexedDB do navegador. Chamar `PlayerPrefs.Save()` depois de cada mudança (fim da batalha, compra na loja, mudança de configuração).
+Serializar uma classe `SaveData` versionada com `JsonUtility` no `PlayerPrefs`, atrás de uma interface `ISaveStore`. As gravações alternam entre duas chaves (`save_a` / `save_b`) com contador e checksum, e o carregamento escolhe a mais recente válida, então uma gravação interrompida nunca destrói o save anterior. No WebGL, o `PlayerPrefs` fica no IndexedDB do navegador. Chamar `PlayerPrefs.Save()` depois de cada mudança (escolha da afinidade, fim da batalha, compra na loja, mudança de configuração).
 
 ```csharp
 [Serializable] class SaveData {
@@ -17,6 +17,8 @@ Serializar uma classe `SaveData` versionada com `JsonUtility` no `PlayerPrefs`, 
     public List<ItemStack> items;            // itemId, count
     public List<UpgradeEntry> upgrades;      // characterId, hp, atk, def, spd (0..5)
     public int campaignStage;                // 0..4
+    public string affinity;                  // "fire" | "water" | "plant"; vazio até a escolha (R11)
+    public List<string> spectrum;            // ids dos lutadores liberados (R11)
     public Settings settings;
 }
 interface ISaveStore { SaveData Load(); void Save(SaveData d); }

@@ -5,10 +5,10 @@
 **Deciders:** Dev team
 
 ## Context
-Persistent data is small: coins, item inventory, upgrade levels (9 characters × 4 stats), campaign progress and settings. That is well under 10 KB. The Notebook plans paid coin packages for after launch, and the team decided on **no backend for the MVP**. The game is a free browser game; local hot-seat is the only multiplayer.
+Persistent data is small: coins, item inventory, upgrade levels (9 characters × 4 stats), campaign progress, the mage's affinity and the spectrum of unlocked fighters (GDD R11), and settings. That is well under 10 KB. The Notebook plans paid coin packages for after launch, and the team decided on **no backend for the MVP**. The game is a free browser game; local hot-seat is the only multiplayer.
 
 ## Decision
-Serialize a versioned `SaveData` class with `JsonUtility` into `PlayerPrefs`, behind an `ISaveStore` interface. Writes alternate between two keys (`save_a` / `save_b`) with a counter and checksum, and loading picks the newest valid one, so an interrupted write never destroys the previous save. On WebGL, `PlayerPrefs` lives in the browser's IndexedDB. Call `PlayerPrefs.Save()` after each change (end of battle, store purchase, settings change).
+Serialize a versioned `SaveData` class with `JsonUtility` into `PlayerPrefs`, behind an `ISaveStore` interface. Writes alternate between two keys (`save_a` / `save_b`) with a counter and checksum, and loading picks the newest valid one, so an interrupted write never destroys the previous save. On WebGL, `PlayerPrefs` lives in the browser's IndexedDB. Call `PlayerPrefs.Save()` after each change (affinity choice, end of battle, store purchase, settings change).
 
 ```csharp
 [Serializable] class SaveData {
@@ -17,6 +17,8 @@ Serialize a versioned `SaveData` class with `JsonUtility` into `PlayerPrefs`, be
     public List<ItemStack> items;            // itemId, count
     public List<UpgradeEntry> upgrades;      // characterId, hp, atk, def, spd (0..5)
     public int campaignStage;                // 0..4
+    public string affinity;                  // "fire" | "water" | "plant"; empty until chosen (R11)
+    public List<string> spectrum;            // ids of unlocked fighters (R11)
     public Settings settings;
 }
 interface ISaveStore { SaveData Load(); void Save(SaveData d); }

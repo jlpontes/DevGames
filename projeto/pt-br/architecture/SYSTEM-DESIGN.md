@@ -24,11 +24,13 @@ Este documento desenha o sistema como um todo: o que ele precisa fazer, como os 
 | F7 | **Efeitos** duram 3 turnos (DoT: Chamas, Afogamento, Veneno; HoT: Regeneração; bônus de atributo) e **acompanham o lutador no banco** | GDD §5.2 |
 | F8 | **Sorteio de arena** a cada 3 rodadas (Mar, Vulcão, Floresta, Lua), ±10% de dano | GDD §5.6 |
 | F9 | Vitória quando todos os lutadores do outro time são derrotados | GDD §2 |
-| F10 | **Campanha:** 4 fases em sequência (treinadores de Fogo, Água e Planta + Boss com 1 lutador exclusivo), cada uma liberada pela anterior | Caderno p.4, p.8 |
+| F10 | **Campanha:** 4 fases em sequência (guardiões de fragmento de Fogo, Água e Planta + Guardião do Núcleo com 1 lutador exclusivo de elemento neutro), cada uma liberada pela anterior | Caderno p.4, p.8; GDD R9, R10 |
 | F11 | **Modos:** Campanha, contra IA (dificuldade escolhida), PvP hot-seat local | GDD §1, Caderno p.9 |
 | F12 | **Economia:** moedas por batalha (vitória 100 / derrota 50 / boss 500) | Mecânicas §7 |
 | F13 | **Loja:** itens consumíveis (Kit Médico, Remédio, Poção de Ataque, Poção de Defesa) e evoluções permanentes (+3% por nível, máx. 5 por atributo) | GDD §5.1 |
-| F14 | O progresso é salvo entre sessões | decorre de F10, F13 |
+| F14 | O progresso é salvo entre sessões | decorre de F10, F13, F15 |
+| F15 | **Espectro:** o jogador escolhe a afinidade (Fogo, Água ou Planta) ao começar a campanha e começa com os 3 lutadores desse elemento; vencer um guardião de fragmento libera os 3 do elemento dele. Em todos os modos o jogador só escolhe lutadores do espectro | GDD R11, Caderno p.2 |
+| F16 | **Cartões de história:** texto com imagem na abertura, antes de cada fase e no final | GDD R12, Caderno p.2 |
 
 ### 1.2 Requisitos não funcionais
 
@@ -52,7 +54,7 @@ Este documento desenha o sistema como um todo: o que ele precisa fazer, como os 
 
 ### 1.4 Decisões de regra
 
-As lacunas do GDD foram fechadas como as regras **R1–R10** em [GDD §5.7](../GDD.md#57-esclarecimentos-de-regras). Este design segue essas regras; as mais relevantes aqui:
+As lacunas do GDD foram fechadas como as regras **R1–R12** em [GDD §5.7](../GDD.md#57-esclarecimentos-de-regras). Este design segue essas regras; as mais relevantes aqui:
 
 | Regra | Resumo |
 |---|---|
@@ -64,7 +66,10 @@ As lacunas do GDD foram fechadas como as regras **R1–R10** em [GDD §5.7](../G
 | R6 | Modo Justo no PvP por padrão: atributos base e kit fixo de itens. |
 | R7 | Stamina por jogador: +20 ao causar dano, +15 ao sofrer dano, +25 ao reagir com sucesso; zera depois do especial. |
 | R8 | Até 3 itens por batalha, consumidos ao usar. |
-| R10 | Campanha Fogo → Água → Planta → Boss; atributos dos treinadores +0 / +7 / +12%. |
+| R9 | Boss: Guardião do Núcleo, lutador único de elemento neutro (sem vantagem nem desvantagem de elemento), ~3× HP, arena Lua. |
+| R10 | Campanha: guardiões de Fogo → Água → Planta → Núcleo; atributos dos guardiões +0 / +7 / +12%; mesma ordem para qualquer afinidade. |
+| R11 | Espectro: começa com os 3 lutadores da afinidade; cada guardião de fragmento vencido libera os 3 do elemento dele; vale para todos os modos (a IA usa os 9). |
+| R12 | História em cartões de texto: abertura, antes de cada fase e final. |
 
 ---
 
@@ -93,6 +98,7 @@ O sistema inteiro é um build web estático. Não existe lado servidor.
 ```
 ┌──────────────────────────── APRESENTAÇÃO ────────────────────────────┐
 │ Cenas: Boot · MainMenu · CampaignMap · TeamSelect · Store · Battle   │
+│        AffinitySelect · StoryCard                                    │
 │ Batalha: BattleDirector ─▶ FighterView×2 · HUD · ActionMenu ·        │
 │          ReactionWindow (QTE) · ArenaRoulette · CameraDirector       │
 └───────────▲─────────────────────────────────────────▲────────────────┘
@@ -109,6 +115,7 @@ O sistema inteiro é um build web estático. Não existe lado servidor.
 ┌───────────┴──────────────────── CONTEÚDO (ScriptableObjects) ──────┴──────────────────┐
 │ ContentDatabase: CharacterDef · SkillDef · EffectDef · ItemDef · ArenaDef ·           │
 │                  OpponentDef · AIProfile · EffectivenessTable · EconomyConfig         │
+│                  StoryCardDef                                                         │
 └───────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -117,9 +124,13 @@ O sistema inteiro é um build web estático. Não existe lado servidor.
 **Fluxo A — Batalha da campanha, do início ao fim**
 
 ```
+MainMenu ──campanha──▶ Profile.affinity vazio?
+   │ sim: AffinitySelect ──▶ CampaignService.StartCampaign(afinidade)
+   │        (espectro = 3 lutadores do elemento; SaveStore.Save()) ──▶ StoryCard(abertura)
 CampaignMap ──escolhe fase──▶ CampaignService.CanPlay(fase)?
    │ sim
-TeamSelect ──equipe + itens──▶ BattleLauncher.Build(setup)
+StoryCard(OpponentDef.storyCard)
+TeamSelect (só lutadores com Profile.IsUnlocked) ──equipe + itens──▶ BattleLauncher.Build(setup)
    │   ├─ StatsResolver: atributos base × evoluções   (Profile)
    │   ├─ ContentDatabase → FighterSpec/SkillSpec      (imutáveis)
    │   ├─ OpponentDef → equipe da IA (+ bônus da fase) + RuleBasedAIController(AIProfile)
@@ -128,9 +139,11 @@ TeamSelect ──equipe + itens──▶ BattleLauncher.Build(setup)
 Cena Battle ──▶ BattleDirector roda o loop do motor (Fluxo B)
    │ BattleEnded(vencedor)
 BattleLauncher.Finish ──▶ Profile.coins += recompensa; consome itens usados;
-                          Campaign.stage++ se venceu; SaveStore.Save()
+                          se venceu: Campaign.stage++ e espectro += equipe do guardião (R11);
+                          SaveStore.Save()
    ▼
-Tela de resultado ──▶ CampaignMap
+Tela de resultado (moedas, lutadores liberados) ──▶ CampaignMap
+   (venceu o Guardião do Núcleo ──▶ StoryCard(final) ──▶ MainMenu)
 ```
 
 **Fluxo B — Uma rodada dentro da batalha**
@@ -205,7 +218,12 @@ public interface IBattleController {
 
 // ── Jogo / Meta ──────────────────────────────────────────────────
 public interface IProfileService { int Coins { get; } int UpgradeLevel(string charId, Stat s);
-                                   int ItemCount(string itemId); int CampaignStage { get; } }
+                                   int ItemCount(string itemId); int CampaignStage { get; }
+                                   Element? Affinity { get; } IReadOnlyCollection<string> Spectrum { get; }
+                                   bool IsUnlocked(string charId); }
+public interface ICampaignService { void StartCampaign(Element affinity);   // R11
+                                    bool CanPlay(int stage);
+                                    StoryCardDef CardBefore(int stage); StoryCardDef EndingCard { get; } }
 public interface IStoreService   { PurchaseResult BuyItem(string itemId);
                                    PurchaseResult BuyUpgrade(string charId, Stat s); }
 public enum PurchaseResult { Ok, NotEnoughCoins, MaxLevelReached, UnknownId }
@@ -230,7 +248,7 @@ public interface ISaveStore      { SaveData Load(); void Save(SaveData d); }
 **Conteúdo (em tempo de autoria, ScriptableObjects)**
 
 ```
-CharacterDef ──┬── id, displayName, element, charClass
+CharacterDef ──┬── id, displayName, element{Fire,Water,Plant,Neutral}, charClass   (Neutral só no Boss, R9)
                ├── baseHp, baseAtk, baseDef(0..100), baseSpd
                ├── skills[2] ──▶ SkillDef
                ├── special   ──▶ SkillDef
@@ -240,7 +258,8 @@ SkillDef ───── id, power, isSpecial, effect? ──▶ EffectDef, effe
 EffectDef ──── id, kind{DoT,HoT,StatMod}, value, stat?, turns=3, cleansable
 ItemDef ────── id, kind{Heal,Cleanse,AtkUp,DefUp}, value, price
 ArenaDef ───── id{Sea,Volcano,Forest,Moon}, rule{Element|SpeedBand}, favoured, penalised, background
-OpponentDef ── id, name, team[1..3] ──▶ CharacterDef, aiProfile ──▶ AIProfile, homeArena, statBonus, items, reward
+OpponentDef ── id, name, team[1..3] ──▶ CharacterDef, aiProfile ──▶ AIProfile, homeArena, statBonus, items, reward, storyCard ──▶ StoryCardDef
+StoryCardDef ─ id, text, image, moment{Opening,BeforeStage,Ending}
 AIProfile ──── survivalHpPct, switchChance, dotTurnsBeforeCleanse, qteChance, counterShare, mistakeChance
 ```
 
@@ -270,11 +289,13 @@ BattleState
   "items": [ { "id": "med_kit", "count": 2 }, { "id": "atk_potion", "count": 1 } ],
   "upgrades": [ { "charId": "fire_mage", "hp": 0, "atk": 3, "def": 1, "spd": 0 } ],
   "campaignStage": 2,
+  "affinity": "water",
+  "spectrum": [ "water_warrior", "water_mage", "water_tank", "fire_warrior", "fire_mage", "fire_tank" ],
   "settings": { "musicVolume": 0.8, "sfxVolume": 1.0, "fairPvp": true }
 }
 ```
 
-Regras: o save se refere ao conteúdo **só por id em texto**. Ids desconhecidos são ignorados ao carregar, então remover conteúdo nunca quebra saves antigos. O campo `version` controla as migrações.
+Regras: o save se refere ao conteúdo **só por id em texto** (inclusive o espectro). Ids desconhecidos são ignorados ao carregar, então remover conteúdo nunca quebra saves antigos. O campo `version` controla as migrações.
 
 ### 3.2 Algoritmos do núcleo
 
@@ -289,6 +310,8 @@ damage  = max(1, round(raw × adv × env × defCut))
 ```
 
 Conferência com o exemplo do GDD: um Mago de Fogo (Atq 171) acerta um Tanque de Planta (Def 95) com uma habilidade de poder 100. Ele tem vantagem de classe e de elemento, então adv = 1,5, resultando em 171 × 1,5 × 0,525 = **135**. Um Tanque de Planta atacando um Mago de Fogo não tem vantagem e o Mago tem duas, então adv = 0,5, resultando em 63 × 0,5 × 0,925 = **29**.
+
+O Boss tem elemento neutro (R9): o `EffectivenessResolver` não conta vantagem de elemento para ele nem contra ele, só a de classe.
 
 **Resolução do turno** (F2, F4, R2):
 

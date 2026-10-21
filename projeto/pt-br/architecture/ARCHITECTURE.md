@@ -25,6 +25,7 @@ Três camadas. As dependências apontam **só para baixo**.
 │ APRESENTAÇÃO  (MonoBehaviours, cenas, UI, animação, áudio)    │
 │  MenuUI · CampaignMapUI · TeamSelectUI · StoreUI · BattleView │
 │  HUD · ReactionWindow (QTE) · ArenaRoulette · CameraDirector  │
+│  AffinitySelectUI · StoryCardUI                               │
 └──────────────▲──────────────────────────────▲─────────────────┘
                │ chama serviços                │ consome BattleEvents,
                │                               │ envia comandos
@@ -40,6 +41,7 @@ Três camadas. As dependências apontam **só para baixo**.
 │ CONTEÚDO  (ScriptableObjects — só dados)                      │
 │  CharacterDef · SkillDef · ItemDef · EffectDef · ArenaDef     │
 │  OpponentDef · AIProfile · EffectivenessTable · EconomyConfig │
+│  StoryCardDef                                                 │
 └───────────────────────────────────────────────────────────────┘
 ```
 
@@ -54,12 +56,13 @@ A decisão central ([ADR-002](adr/ADR-002-battle-core-separation.md)): **as regr
 
 | Asset | Campos (resumo) | Quantidade no MVP |
 |---|---|---|
-| `CharacterDef` | id, nome, `Element`, `CharClass`, HP/Atq/Def/Vel base, 2 habilidades normais + 1 especial, sprite/animator, clipes de voz | 9 + 1 boss |
+| `CharacterDef` | id, nome, `Element` (Fogo / Água / Planta; Neutro só no Boss, GDD R9), `CharClass`, HP/Atq/Def/Vel base, 2 habilidades normais + 1 especial, sprite/animator, clipes de voz | 9 + 1 boss |
 | `SkillDef` | poder, `isSpecial`, alvo, `EffectDef` opcional + chance, VFX/SFX | ~30 |
 | `EffectDef` | tipo (DoT / HoT / StatMod), valor, duração (padrão 3), `removableByMedicine` | ~6 (Chamas, Afogamento, Veneno, Regeneração, Atq↑, Def↑) |
 | `ItemDef` | tipo (Cura / Limpeza / Poção de Ataque / Poção de Defesa), valor, preço | 4 |
 | `ArenaDef` | Mar / Vulcão / Floresta / Lua, regra de favorecido/prejudicado, arte de fundo | 4 |
-| `OpponentDef` | nome, equipe (1–3 `CharacterDef`), `AIProfile`, arena de origem (arena inicial), bônus de atributos (+0 / +7 / +12%), itens iniciais, recompensa | 4 (Fogo, Água, Planta, Boss) |
+| `OpponentDef` | nome, equipe (1–3 `CharacterDef`), `AIProfile`, arena de origem (arena inicial), bônus de atributos (+0 / +7 / +12%), itens iniciais, recompensa, `StoryCardDef` mostrado antes da fase | 4 (Guardiões de Fogo, Água e Planta, Guardião do Núcleo) |
+| `StoryCardDef` | id, texto, imagem, momento (abertura / antes da fase N / final) | 6 (GDD R12) |
 | `AIProfile` | limites e chances das regras de prioridade ([ADR-004](adr/ADR-004-ai-approach.md)) | 7 (Fácil, Normal, Difícil + 4 oponentes) |
 | `EffectivenessTable` | os dois ciclos (Fogo→Planta→Água, Guerreiro→Mago→Tanque), multiplicadores 1,3/1,5 e 0,7/0,5 | 1 |
 | `EconomyConfig` | moedas (vitória 100 / derrota 50 / boss 500), +3% por evolução, máx. 5 por atributo | 1 |
@@ -146,10 +149,11 @@ interface IBattleController {
 ### 3.4 Camada de Jogo / Meta (C# comum, pertence ao `GameRoot`)
 
 - **`GameRoot`** é um objeto `DontDestroyOnLoad` criado na cena `Boot`. Ele é dono dos serviços abaixo e os expõe por um único acesso estático (`Game.Profile`, `Game.Store`, ...). O projeto é pequeno demais para precisar de framework de DI.
-- **`ProfileService`** guarda moedas, inventário, níveis de evolução por personagem (0–5 por atributo), progresso da campanha (índice do último oponente vencido) e configurações.
+- **`ProfileService`** guarda moedas, inventário, níveis de evolução por personagem (0–5 por atributo), progresso da campanha (índice do último oponente vencido), a afinidade do mago, o espectro (ids dos lutadores liberados) e configurações. `IsUnlocked(charId)` responde se um lutador pode ser escolhido.
 - **`StoreService`** trata `BuyItem` e `BuyUpgrade`. Valida o preço, o limite de 5 evoluções e o saldo, e depois salva.
-- **`CampaignService`** cuida das 4 fases (Fogo, Água, Planta, Boss), do desbloqueio e das recompensas.
+- **`CampaignService`** cuida das 4 fases (Guardiões de Fogo, Água e Planta, Guardião do Núcleo), do desbloqueio das fases e das recompensas. `StartCampaign(afinidade)` grava a afinidade e coloca no espectro os 3 lutadores desse elemento. Ao vencer um guardião de fragmento, libera no espectro os 3 lutadores do elemento dele (GDD R11). Também diz qual `StoryCardDef` mostrar antes de cada fase e no final (GDD R12).
 - **`StatsResolver`** calcula os atributos efetivos como base × (1 + 0,03 × nível). No Modo Justo do PvP (padrão) devolve os atributos base (GDD R6). Os oponentes da campanha recebem o bônus da fase (GDD R10).
+- **`TeamSelect`** só oferece lutadores do espectro, em todos os modos (campanha, contra IA e PvP local). A equipe da IA não passa por esse filtro.
 - **`BattleLauncher`** monta um `BattleSetup` (equipes, controladores, seed, arena inicial, recompensas) e carrega a cena `Battle`. No `BattleEnded`, paga as moedas, atualiza o progresso e volta para o menu certo.
 - **`SaveStore`** ([ADR-005](adr/ADR-005-persistence.md)) grava um `SaveData` versionado, serializado com `JsonUtility`, no `PlayerPrefs`. No WebGL ele fica no IndexedDB. A interface `ISaveStore` é o ponto de troca para um futuro save na nuvem e pacotes de moedas pagos.
 
@@ -158,11 +162,13 @@ interface IBattleController {
 **Cenas** (de `telas.excalidraw`):
 
 ```
-Boot ─▶ MainMenu ─┬─▶ CampaignMap (Fogo · Água · Planta · Boss Final) ─▶ TeamSelect ─▶ Battle
-                  ├─▶ PvP ─▶ TeamSelect (Equipe 1 / Equipe 2) ─────────────────────▶ Battle
-                  ├─▶ Contra IA (dificuldade) ─▶ TeamSelect ────────────────────────▶ Battle
+Boot ─▶ MainMenu ─┬─▶ [sem afinidade] AffinitySelect ─▶ StoryCard (abertura) ─▶ CampaignMap
+                  ├─▶ CampaignMap (Fogo · Água · Planta · Núcleo) ─▶ StoryCard (fase) ─▶ TeamSelect ─▶ Battle
+                  ├─▶ PvP ─▶ TeamSelect (Equipe 1 / Equipe 2, só o espectro) ──────────────────────▶ Battle
+                  ├─▶ Contra IA (dificuldade) ─▶ TeamSelect (só o espectro) ───────────────────────▶ Battle
                   └─▶ Store (Loja de Itens · Progressão de Atributos)
-Battle ─▶ Tela de resultado (moedas ganhas) ─▶ CampaignMap / MainMenu
+Battle ─▶ Tela de resultado (moedas ganhas, lutadores liberados) ─▶ CampaignMap / MainMenu
+Vitória contra o Guardião do Núcleo ─▶ StoryCard (final) ─▶ MainMenu
 ```
 
 **Componentes da cena de batalha**
@@ -218,7 +224,7 @@ As assembly definitions garantem as camadas: um `using UnityEngine;` dentro de `
 
 ## 7. Perguntas de design (resolvidas)
 
-As nove lacunas encontradas no GDD (Q1–Q9) foram fechadas em 02/10/2026 e escritas no GDD como as regras R1–R10, em [§5.7 Esclarecimentos de Regras](../GDD.md#57-esclarecimentos-de-regras). O código segue o GDD; esta tabela só mapeia a numeração antiga.
+As nove lacunas encontradas no GDD (Q1–Q9) foram fechadas em 02/10/2026 e escritas no GDD como as regras R1–R10, em [§5.7 Esclarecimentos de Regras](../GDD.md#57-esclarecimentos-de-regras). Em 20/10/2026 a história do Cristal Elemental acrescentou R11 e R12 e mudou R9 e R10. O código segue o GDD; esta tabela só mapeia a numeração antiga.
 
 | # | Pergunta | Resolvida por |
 |---|---|---|
@@ -230,8 +236,10 @@ As nove lacunas encontradas no GDD (Q1–Q9) foram fechadas em 02/10/2026 e escr
 | Q6 | Justiça no PvP | R6: Modo Justo por padrão |
 | Q7 | Stamina | R7: por jogador, +20 / +15 / +25, zera depois do especial |
 | Q8 | Itens | R8: máx. 3 por batalha, Kit Médico 30%, poções +10% por 3 turnos |
-| Q9 | Boss | R9: lutador único, ~3× HP, sem ações extras, arena Lua |
-| — | Ordem da campanha e força dos oponentes | R10: Fogo → Água → Planta → Boss; equipes de um só elemento; +0 / +7 / +12% |
+| Q9 | Boss | R9: Guardião do Núcleo, lutador único de elemento neutro, ~3× HP, sem ações extras, arena Lua |
+| — | Ordem da campanha e força dos oponentes | R10: guardiões de Fogo → Água → Planta → Núcleo; equipes de um só elemento; +0 / +7 / +12% |
+| — | Lutadores disponíveis | R11: afinidade escolhida no início; o espectro começa com os 3 do elemento e cresce a cada guardião vencido; vale em todos os modos |
+| — | Como a história aparece | R12: cartões de texto com imagem (abertura, antes de cada fase, final) |
 
 Ainda em aberto (não bloqueia a semana 1): preços da loja, atributos e habilidades do Boss, e o level design das fases de Fogo, Planta e Boss. Veja [NEXT-STEPS.md](../../NEXT-STEPS.md).
 

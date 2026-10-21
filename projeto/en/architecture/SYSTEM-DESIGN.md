@@ -24,11 +24,13 @@ This document designs the system as a whole: what it must do, how data flows, wh
 | F7 | **Effects** last 3 turns (DoT: Flames, Drowning, Poison; HoT: Regeneration; stat buffs) and **follow the fighter to the bench** | GDD §5.2 |
 | F8 | **Arena draw** every 3 rounds (Sea, Volcano, Forest, Moon), ±10% damage | GDD §5.6 |
 | F9 | Victory when every fighter on the other team is defeated | GDD §2 |
-| F10 | **Campaign:** 4 stages in sequence (Fire, Water, Plant trainers + Boss with 1 exclusive fighter), each unlocked by the previous one | Notebook p.4, p.8 |
+| F10 | **Campaign:** 4 stages in sequence (Fire, Water and Plant fragment guardians + Core Guardian with 1 exclusive neutral-element fighter), each unlocked by the previous one | Notebook p.4, p.8; GDD R9, R10 |
 | F11 | **Modes:** Campaign, vs AI (chosen difficulty), local hot-seat PvP | GDD §1, Notebook p.9 |
 | F12 | **Economy:** coins per battle (win 100 / loss 50 / boss 500) | Mechanics §7 |
 | F13 | **Store:** consumable items (Med Kit, Medicine, Atk Potion, Def Potion) and permanent upgrades (+3% per level, max 5 per stat) | GDD §5.1 |
-| F14 | Progress is saved between sessions | implied by F10, F13 |
+| F14 | Progress is saved between sessions | implied by F10, F13, F15 |
+| F15 | **Spectrum:** the player picks an affinity (Fire, Water or Plant) when starting the campaign and starts with that element's 3 fighters; beating a fragment guardian unlocks the 3 of its element. In every mode the player only picks fighters from the spectrum | GDD R11, Notebook p.2 |
+| F16 | **Story cards:** text with an image at the opening, before each stage and at the end | GDD R12, Notebook p.2 |
 
 ### 1.2 Non-functional requirements
 
@@ -52,7 +54,7 @@ This document designs the system as a whole: what it must do, how data flows, wh
 
 ### 1.4 Rule decisions
 
-The gaps in the GDD were closed as rules **R1–R10** in [GDD §5.7](../GDD.md#57-rule-clarifications). This design follows them; the most relevant ones here:
+The gaps in the GDD were closed as rules **R1–R12** in [GDD §5.7](../GDD.md#57-rule-clarifications). This design follows them; the most relevant ones here:
 
 | Rule | Summary |
 |---|---|
@@ -64,7 +66,10 @@ The gaps in the GDD were closed as rules **R1–R10** in [GDD §5.7](../GDD.md#5
 | R6 | PvP Fair Mode by default: base stats and a fixed item kit. |
 | R7 | Stamina per player: +20 dealing damage, +15 taking damage, +25 successful reaction; resets to 0 after the special. |
 | R8 | Up to 3 items per battle, consumed when used. |
-| R10 | Campaign Fire → Water → Plant → Boss; trainer stats +0 / +7 / +12%. |
+| R9 | Boss: Core Guardian, a single neutral-element fighter (no element advantage or disadvantage), ~3× HP, Moon arena. |
+| R10 | Campaign: Fire → Water → Plant → Core guardians; guardian stats +0 / +7 / +12%; same order for any affinity. |
+| R11 | Spectrum: starts with the affinity's 3 fighters; each fragment guardian beaten unlocks the 3 of its element; applies to every mode (the AI uses all 9). |
+| R12 | Story on text cards: opening, before each stage and ending. |
 
 ---
 
@@ -93,6 +98,7 @@ The whole system is one static web build. There is no server side.
 ```
 ┌──────────────────────────── PRESENTATION ────────────────────────────┐
 │ Scenes: Boot · MainMenu · CampaignMap · TeamSelect · Store · Battle  │
+│         AffinitySelect · StoryCard                                   │
 │ Battle: BattleDirector ─▶ FighterView×2 · HUD · ActionMenu ·         │
 │         ReactionWindow (QTE) · ArenaRoulette · CameraDirector        │
 └───────────▲─────────────────────────────────────────▲────────────────┘
@@ -108,6 +114,7 @@ The whole system is one static web build. There is no server side.
 ┌───────────┴──────────────────── CONTENT (ScriptableObjects) ───────┴──────────────────┐
 │ ContentDatabase: CharacterDef · SkillDef · EffectDef · ItemDef · ArenaDef ·           │
 │                  OpponentDef · AIProfile · EffectivenessTable · EconomyConfig         │
+│                  StoryCardDef                                                         │
 └───────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -116,9 +123,13 @@ The whole system is one static web build. There is no server side.
 **Flow A — Campaign battle, end to end**
 
 ```
+MainMenu ──campaign──▶ Profile.affinity empty?
+   │ yes: AffinitySelect ──▶ CampaignService.StartCampaign(affinity)
+   │        (spectrum = the element's 3 fighters; SaveStore.Save()) ──▶ StoryCard(opening)
 CampaignMap ──select stage──▶ CampaignService.CanPlay(stage)?
    │ yes
-TeamSelect ──team + items──▶ BattleLauncher.Build(setup)
+StoryCard(OpponentDef.storyCard)
+TeamSelect (only fighters where Profile.IsUnlocked) ──team + items──▶ BattleLauncher.Build(setup)
    │   ├─ StatsResolver: base stats × upgrades      (Profile)
    │   ├─ ContentDatabase → FighterSpec/SkillSpec    (immutable)
    │   ├─ OpponentDef → AI team (+ stage stat bonus) + RuleBasedAIController(AIProfile)
@@ -127,9 +138,11 @@ TeamSelect ──team + items──▶ BattleLauncher.Build(setup)
 Battle scene ──▶ BattleDirector runs the engine loop (Flow B)
    │ BattleEnded(winner)
 BattleLauncher.Finish ──▶ Profile.coins += reward; consume used items;
-                          Campaign.stage++ if won; SaveStore.Save()
+                          if won: Campaign.stage++ and spectrum += guardian's team (R11);
+                          SaveStore.Save()
    ▼
-Result screen ──▶ CampaignMap
+Result screen (coins, fighters unlocked) ──▶ CampaignMap
+   (beat the Core Guardian ──▶ StoryCard(ending) ──▶ MainMenu)
 ```
 
 **Flow B — One round inside the battle**
@@ -204,7 +217,12 @@ public interface IBattleController {
 
 // ── Game / Meta ──────────────────────────────────────────────────
 public interface IProfileService { int Coins { get; } int UpgradeLevel(string charId, Stat s);
-                                   int ItemCount(string itemId); int CampaignStage { get; } }
+                                   int ItemCount(string itemId); int CampaignStage { get; }
+                                   Element? Affinity { get; } IReadOnlyCollection<string> Spectrum { get; }
+                                   bool IsUnlocked(string charId); }
+public interface ICampaignService { void StartCampaign(Element affinity);   // R11
+                                    bool CanPlay(int stage);
+                                    StoryCardDef CardBefore(int stage); StoryCardDef EndingCard { get; } }
 public interface IStoreService   { PurchaseResult BuyItem(string itemId);
                                    PurchaseResult BuyUpgrade(string charId, Stat s); }
 public enum PurchaseResult { Ok, NotEnoughCoins, MaxLevelReached, UnknownId }
@@ -229,7 +247,7 @@ public interface ISaveStore      { SaveData Load(); void Save(SaveData d); }
 **Content (authoring time, ScriptableObjects)**
 
 ```
-CharacterDef ──┬── id, displayName, element, charClass
+CharacterDef ──┬── id, displayName, element{Fire,Water,Plant,Neutral}, charClass   (Neutral for the Boss only, R9)
                ├── baseHp, baseAtk, baseDef(0..100), baseSpd
                ├── skills[2] ──▶ SkillDef
                ├── special   ──▶ SkillDef
@@ -239,7 +257,8 @@ SkillDef ───── id, power, isSpecial, effect? ──▶ EffectDef, effe
 EffectDef ──── id, kind{DoT,HoT,StatMod}, value, stat?, turns=3, cleansable
 ItemDef ────── id, kind{Heal,Cleanse,AtkUp,DefUp}, value, price
 ArenaDef ───── id{Sea,Volcano,Forest,Moon}, rule{Element|SpeedBand}, favoured, penalised, background
-OpponentDef ── id, name, team[1..3] ──▶ CharacterDef, aiProfile ──▶ AIProfile, homeArena, statBonus, items, reward
+OpponentDef ── id, name, team[1..3] ──▶ CharacterDef, aiProfile ──▶ AIProfile, homeArena, statBonus, items, reward, storyCard ──▶ StoryCardDef
+StoryCardDef ─ id, text, image, moment{Opening,BeforeStage,Ending}
 AIProfile ──── survivalHpPct, switchChance, dotTurnsBeforeCleanse, qteChance, counterShare, mistakeChance
 ```
 
@@ -269,11 +288,13 @@ BattleState
   "items": [ { "id": "med_kit", "count": 2 }, { "id": "atk_potion", "count": 1 } ],
   "upgrades": [ { "charId": "fire_mage", "hp": 0, "atk": 3, "def": 1, "spd": 0 } ],
   "campaignStage": 2,
+  "affinity": "water",
+  "spectrum": [ "water_warrior", "water_mage", "water_tank", "fire_warrior", "fire_mage", "fire_tank" ],
   "settings": { "musicVolume": 0.8, "sfxVolume": 1.0, "fairPvp": true }
 }
 ```
 
-Rules: save files refer to content **by string id only**. Unknown ids are ignored when loading, so removing content never breaks old saves. `version` drives migrations.
+Rules: save files refer to content **by string id only** (the spectrum included). Unknown ids are ignored when loading, so removing content never breaks old saves. `version` drives migrations.
 
 ### 3.2 Core algorithms
 
@@ -288,6 +309,8 @@ damage  = max(1, round(raw × adv × env × defCut))
 ```
 
 Check against the GDD's example: a Fire Mage (Atk 171) hits a Plant Tank (Def 95) with a power-100 skill. It has class and element advantage, so adv = 1.5, giving 171 × 1.5 × 0.525 = **135**. A Plant Tank attacking a Fire Mage has no advantage, and the Mage has two, so adv = 0.5, giving 63 × 0.5 × 0.925 = **29**.
+
+The Boss is neutral-element (R9): `EffectivenessResolver` counts no element advantage for or against it, only class.
 
 **Turn resolution** (F2, F4, R2):
 
