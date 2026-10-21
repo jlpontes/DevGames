@@ -11,7 +11,7 @@ Esta é a principal mecânica de "hazard" do jogo. A arena é um ambiente dinâm
     *   **Mar:** Favorece personagens de Água / Prejudica personagens de Fogo.
     *   **Vulcão:** Favorece personagens de Fogo / Prejudica personagens de Planta.
     *   **Floresta:** Favorece personagens de Planta / Prejudica personagens de Água.
-    *   **Lua (Baixa gravidade):** Favorece personagens com baixa Velocidade / Prejudica personagens com alta Velocidade.
+    *   **Lua (pesada pelo núcleo do cristal):** Favorece personagens com baixa Velocidade / Prejudica personagens com alta Velocidade.
 
 ## 2. Janela de Resposta (Desvio e Contra-ataque)
 Uma mecânica interativa (QTE - Quick Time Event) que quebra o ritmo passivo dos turnos convencionais.

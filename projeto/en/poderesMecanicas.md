@@ -11,7 +11,7 @@ This is the main "hazard" mechanic of the game. The arena is a dynamic environme
     *   **Sea:** Favors Water characters / Disadvantages Fire characters.
     *   **Volcano:** Favors Fire characters / Disadvantages Plant characters.
     *   **Forest:** Favors Plant characters / Disadvantages Water characters.
-    *   **Moon (Low gravity):** Favors characters with low Speed / Disadvantages characters with high Speed.
+    *   **Moon (weighed down by the crystal's core):** Favors characters with low Speed / Disadvantages characters with high Speed.
 
 ## 2. Response Window (Dodge and Counter-attack)
 An interactive mechanic (QTE - Quick Time Event) that breaks the passive rhythm of conventional turns.

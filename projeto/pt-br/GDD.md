@@ -7,13 +7,13 @@
 - **Público-Alvo:** Fãs de RPG tático (+14 anos), entusiastas de otimização de builds e jogadores de PvP competitivo.
 - **Classificação Indicativa:** 14 anos.
 - **Modos de Jogo:** Multiplayer, Singleplayer, Player versus Player (PvP), Player vs IA.
-- **Temática Central:** Um torneio de arena/clube da luta onde o jogador gerencia e reveza uma equipe de três lutadores em combates de alto risco.
+- **Temática Central:** Um mago reúne os fragmentos do Cristal Elemental, que se rompeu e criou as zonas elementais, duelando com os guardiões de cada zona e revezando uma equipe de três lutadores. A história completa está no [Caderno, página 2](caderno.md#página-2-história-e-fluxo-do-jogo).
 - **Diferenciais:** Habilidades combinatórias de classe e sorteio de arena estilo cassino (o elemento de gambling do MVP). Um sistema de apostas com moedas está previsto para depois do MVP (ver seção 6).
 - **Referências e Competidores:** Persona, Pokémon, Baldur's Gate, Expedition 33.
 
 ## 2. Resumo da Jogabilidade
 
-- **Estrutura de Equipe:** O jogador escolhe e gerencia uma equipe de 3 personagens de diferentes classes e elementos.
+- **Estrutura de Equipe:** O jogador escolhe e gerencia uma equipe de 3 personagens entre os lutadores liberados no seu espectro (ver R11).
 - **Menu Fora de Combate:** Permite a evolução de atributos dos personagens e a escolha da equipe.
 - **Dinâmica de Combate:** Duelos 1v1 por turnos.
 - **Ações por Turno:** O jogador pode escolher entre três ações:
@@ -142,7 +142,7 @@ Ambientes e seus efeitos:
 | Mar | Personagens de Água (+10% de dano) | Personagens de Fogo  (-10% de dano) |
 | Vulcão | Personagens de Fogo (+10% de dano) | Personagens de Planta (-10% de dano) |
 | Floresta | Personagens de Planta (+10% de dano) | Personagens de Água (-10% de dano) |
-| Lua (Baixa gravidade) | Personagens de baixa Velocidade (< 50) | Personagens de alta Velocidade (≥ 70) |
+| Lua (pesada pelo núcleo do cristal) | Personagens de baixa Velocidade (< 50) | Personagens de alta Velocidade (≥ 70) |
 
 ### 5.7 Esclarecimentos de Regras
 
@@ -158,8 +158,10 @@ Decisões tomadas em 02/10/2026 para fechar lacunas que bloqueavam a implementa�
 | R6 | Justiça no PvP | O PvP local usa o **Modo Justo** por padrão: atributos base (sem evoluções da loja) e um kit fixo de 1 Kit Médico, 1 Remédio e 1 Poção de Ataque. Pode ser desligado na configuração do PvP. |
 | R7 | Stamina | Uma barra por jogador (0–100), compartilhada pela equipe. +20 ao causar dano, +15 ao sofrer dano, +25 ao desviar ou contra-atacar com sucesso. Zera depois do ataque especial. |
 | R8 | Itens na batalha | Até 3 itens por batalha, tirados do inventário e consumidos ao usar. Kit Médico cura 30% do HP máximo. Remédio remove todos os efeitos negativos. Poções de Ataque e Defesa dão +10% por 3 turnos. |
-| R9 | Boss | Um único lutador exclusivo, com cerca de 3× o HP de um personagem jogável e sem ações extras por turno. Arena de origem: Lua. |
-| R10 | Campanha | Ordem: Treinador de Fogo (Vulcão), Treinador de Água (Mar), Treinador de Planta (Floresta), Boss (Lua). A equipe de cada treinador tem os três personagens do seu elemento. Os atributos dos treinadores escalam com a fase: +0%, +7%, +12%. |
+| R9 | Boss | O Guardião do Núcleo: um único lutador exclusivo, com cerca de 3× o HP de um personagem jogável e sem ações extras por turno. Arena de origem: Lua. É de **elemento neutro**: não tem vantagem nem desvantagem de elemento, só a de classe. |
+| R10 | Campanha | Ordem: Guardião de Fogo (Vulcão), Guardião de Água (Mar), Guardião de Planta (Floresta), Guardião do Núcleo (Lua). A equipe de cada guardião de fragmento tem os três personagens do seu elemento. Os atributos dos guardiões escalam com a fase: +0%, +7%, +12%. A ordem é a mesma qualquer que seja a afinidade escolhida. |
+| R11 | Espectro | Ao começar a campanha, o jogador escolhe a afinidade do mago (Fogo, Água ou Planta) e o espectro começa com os 3 lutadores desse elemento. Vencer um guardião de fragmento libera os 3 lutadores do elemento dele (o guardião da própria afinidade não libera ninguém novo). O espectro vale para todos os modos: contra IA e PvP local só usam lutadores liberados. A IA pode usar os 9. |
+| R12 | Narrativa | A história aparece em cartões de texto com imagem: abertura, antes de cada uma das 4 fases e final. Sem diálogos nem cutscenes no MVP. |
 
 ## 6. Escopo do MVP
 

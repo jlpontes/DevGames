@@ -7,13 +7,13 @@
 - **Target Audience:** Tactical RPG fans (14+ years), build optimization enthusiasts, and competitive PvP players.
 - **Age Rating:** 14 years.
 - **Game Modes:** Multiplayer, Singleplayer, Player versus Player (PvP), Player vs AI.
-- **Central Theme:** An arena/fight club tournament where the player manages and rotates a team of three fighters in high-stakes combat.
+- **Central Theme:** A mage gathers the fragments of the Elemental Crystal, which shattered and created the elemental zones, dueling the guardian of each zone while rotating a team of three fighters. The full story is in the [Notebook, page 2](caderno.md#page-2-story-and-game-flow).
 - **Key Features:** Combinatorial class skills and a casino-style arena draw (the gambling element of the MVP). A coin-betting system is planned after the MVP (see section 6).
 - **References and Competitors:** Persona, Pokémon, Baldur's Gate, Expedition 33.
 
 ## 2. Gameplay Summary
 
-- **Team Structure:** The player chooses and manages a team of 3 characters from different classes and elements.
+- **Team Structure:** The player chooses and manages a team of 3 characters from the fighters unlocked in their spectrum (see R11).
 - **Out-of-Combat Menu:** Allows for the evolution of character attributes and team selection.
 - **Combat Dynamics:** Turn-based 1v1 duels.
 - **Turn Actions:** The player can choose among three actions:
@@ -136,7 +136,7 @@ Environments and their effects:
 | Sea | Water Characters | Fire Characters |
 | Volcano | Fire Characters | Plant Characters |
 | Forest | Plant Characters | Water Characters |
-| Moon | Low Speed Characters (Speed < 50) | High Speed Characters (Speed ≥ 70) |
+| Moon (weighed down by the crystal's core) | Low Speed Characters (Speed < 50) | High Speed Characters (Speed ≥ 70) |
 
 ### 5.7 Rule Clarifications
 
@@ -152,8 +152,10 @@ Decisions taken on 2026-10-02 to close gaps that blocked implementation. Numeric
 | R6 | PvP fairness | Local PvP uses **Fair Mode** by default: base attributes (no store upgrades) and a fixed kit of 1 Medical Kit, 1 Medicine and 1 Attack Potion. It can be turned off in the PvP setup. |
 | R7 | Stamina | One bar per player (0–100), shared by the team. +20 when dealing damage, +15 when taking damage, +25 on a successful dodge or counter-attack. It resets to 0 after the special attack. |
 | R8 | Items in battle | Up to 3 items per battle, taken from the inventory and consumed when used. Medical Kit heals 30% of max HP. Medicine removes all negative effects. Attack and Defense Potions give +10% for 3 turns. |
-| R9 | Boss | A single exclusive fighter with about 3× the HP of a playable character and no extra actions per turn. Home arena: Moon. |
-| R10 | Campaign | Order: Fire trainer (Volcano), Water trainer (Sea), Plant trainer (Forest), Boss (Moon). Each trainer's team has the three characters of its element. Trainer attributes scale with the stage: +0%, +7%, +12%. |
+| R9 | Boss | The Core Guardian: a single exclusive fighter with about 3× the HP of a playable character and no extra actions per turn. Home arena: Moon. It is **neutral-element**: no element advantage or disadvantage, only class. |
+| R10 | Campaign | Order: Fire guardian (Volcano), Water guardian (Sea), Plant guardian (Forest), Core Guardian (Moon). Each fragment guardian's team has the three characters of its element. Guardian attributes scale with the stage: +0%, +7%, +12%. The order is the same whatever affinity is chosen. |
+| R11 | Spectrum | When starting the campaign, the player picks the mage's affinity (Fire, Water, or Plant) and the spectrum starts with that element's 3 fighters. Defeating a fragment guardian unlocks the 3 fighters of its element (the guardian of the player's own affinity unlocks no one new). The spectrum applies to every mode: vs AI and local PvP only use unlocked fighters. The AI may use all 9. |
+| R12 | Narrative | The story is shown on text cards with an image: opening, before each of the 4 stages, and ending. No dialogue or cutscenes in the MVP. |
 
 ## 6. MVP Scope
 
