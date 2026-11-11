@@ -27,7 +27,9 @@ namespace ComboTactics.UI
         private Coroutine _inputRoutine;
         private bool _confirmQuit;
 
-        private RawImage _background;
+        private ArenaStage _stage;
+        private Image _topBorder;
+        private Image _dockBorder;
         private Text _arenaName;
         private Text _arenaEffect;
         private Text _roundInfo;
@@ -51,7 +53,7 @@ namespace ComboTactics.UI
             // Seed e comandos reproduzem a batalha inteira: vão junto no relatório de erro.
             App.Errors.Context = () => "Batalha " + _match.Mode + " · seed " + _engine.Seed + "\n" + string.Join("\n", _engine.CommandLog);
 
-            _background = Ui.Picture(Root, "Arena", Art.Arena(_view.Arena), 0, 0, Theme.Width, Theme.Height);
+            _stage = ArenaStage.Create(Root, _view.Arena);
 
             for (int side = 0; side < 2; side++)
             {
@@ -60,6 +62,7 @@ namespace ComboTactics.UI
             }
 
             var top = Ui.Frame(Root, "ArenaInfo", 456, 10, 368, 104, Theme.Panel, Theme.BorderGold, 2f);
+            _topBorder = top.parent.GetComponent<Image>();
             _arenaName = Ui.Label(top, "", 8, 2, 352, 26, 20, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold, true);
             _arenaEffect = Ui.Label(top, "", 8, 26, 352, 20, 12, Theme.Text);
             _roundInfo = Ui.Label(top, "", 8, 46, 352, 20, 13, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold);
@@ -70,6 +73,7 @@ namespace ComboTactics.UI
             _quitLabel = quit.GetComponentInChildren<Text>();
 
             var dock = Ui.Frame(Root, "CombatDock", 16, 566, 1248, 144, Theme.Panel, Theme.BorderGold, 2f);
+            _dockBorder = dock.parent.GetComponent<Image>();
             var msgStrip = Ui.Box(dock, "MessageStrip", 4, 4, 1236, 32, new Color(0.05f, 0.04f, 0.04f, 0.72f));
             Ui.Box(dock, "Divider", 4, 36, 1236, 1.5f, Theme.BorderSubtle);
             _message = Ui.Label(msgStrip.transform, "", 14, 0, 1208, 32, 18, Theme.Text, TextAnchor.MiddleCenter, FontStyle.Bold, true);
@@ -77,9 +81,9 @@ namespace ComboTactics.UI
             _menu = Ui.Node(Root, "Menu", 16, 604, 1248, 106);
             _overlay = Ui.Node(Root, "Overlay", 0, 0, Theme.Width, Theme.Height);
 
-            RefreshHud();
             ShowActive(0);
             ShowActive(1);
+            RefreshHud();
             Say("A batalha começa na arena " + CurrentArena.Name + "!");
 
             IBattleController side0 = new HumanController(this, _match.Mode == GameMode.LocalPvp);
@@ -100,7 +104,7 @@ namespace ComboTactics.UI
 
         private IEnumerator RunBattle(BattleDirector director)
         {
-            yield return Wait(0.8f);
+            yield return PlayBattleIntro();
             yield return director.Run();
             // Fim: paga as moedas, consome os itens usados, atualiza a campanha e salva (SYSTEM-DESIGN, Fluxo A).
             var result = App.Services.Launcher.Finish(_match, _engine);

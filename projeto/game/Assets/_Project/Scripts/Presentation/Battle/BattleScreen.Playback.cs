@@ -235,6 +235,7 @@ namespace ComboTactics.UI
 
             var pillar = SpawnVfx(Art.VfxPillar, defender.CenterX, defender.CenterY + 10f, 180f, 220f, elemColor);
             var wave = SpawnVfx(Art.VfxRing, defender.CenterX, defender.CenterY + 55f, 100f, 50f, Color.Lerp(elemColor, Color.white, 0.4f));
+            _stage.Shake(6.5f, 0.28f);
             yield return Tween(0.28f, t =>
             {
                 PlaceVfx(pillar, defender.CenterX, defender.CenterY + 20f - 40f * t, 190f, Mathf.Lerp(80f, 260f, t), 1f - t * t);
@@ -382,6 +383,7 @@ namespace ComboTactics.UI
             var pillar = SpawnVfx(Art.VfxPillar, defender.CenterX, defender.CenterY, 220f, 360f, elemColor);
             var core = SpawnVfx(Art.VfxPillar, defender.CenterX, defender.CenterY, 120f, 340f, Color.Lerp(elemColor, Color.white, 0.55f));
             var ring = SpawnVfx(Art.VfxRing, defender.CenterX, defender.CenterY + 50f, 120f, 60f, elemColor);
+            _stage.Shake(9.5f, 0.42f);
 
             yield return Tween(0.42f, t =>
             {
@@ -595,6 +597,7 @@ namespace ComboTactics.UI
             }
 
             widget.SetHp(from);
+            if (shake) _stage.Shake(5.5f, 0.26f);
             RawImage impact = shake
                 ? SpawnVfx(Art.VfxRing, widget.CenterX, widget.CenterY, 90f, 90f, Theme.Bad)
                 : SpawnVfx(Art.VfxOrb, widget.CenterX, widget.CenterY, 130f, 130f, color);
@@ -636,37 +639,164 @@ namespace ComboTactics.UI
             yield return Wait(0.25f);
         }
 
-        /// <summary>Sorteio de arena no estilo roleta de cassino (GDD §5.6): as arenas giram e desaceleram até a sorteada.</summary>
+        /// <summary>Introdução cinematográfica da arena no início do combate.</summary>
+        private IEnumerator PlayBattleIntro()
+        {
+            var arena = CurrentArena;
+            Color arenaColor = Theme.ArenaColor(arena.Id);
+            var banner = Ui.Frame(_overlay, "IntroBanner", 240, 210, 800, 96, Theme.Panel, arenaColor, 2.5f);
+            var title = Ui.Label(banner, "ARENA: " + arena.Name.ToUpper(), 16, 10, 768, 42, 32, arenaColor, TextAnchor.MiddleCenter, FontStyle.Bold, true);
+            var sub = Ui.Label(banner, Theme.ArenaEffect(arena, _engine.Rules), 16, 52, 768, 32, 16, Theme.Text, TextAnchor.MiddleCenter, FontStyle.Bold);
+            var ring = SpawnVfx(Art.VfxRing, Theme.Width * 0.5f, 258f, 120f, 60f, arenaColor);
+
+            yield return Tween(0.85f, t =>
+            {
+                float ease = 1f - (1f - t) * (1f - t);
+                _stage.SetIntroZoom(ease);
+                _fighters[0].SetOffset(new Vector2(-110f * (1f - ease), 0f));
+                _fighters[1].SetOffset(new Vector2(110f * (1f - ease), 0f));
+                float bannerScale = Mathf.Lerp(0.88f, 1.0f, ease);
+                banner.localScale = new Vector3(bannerScale, bannerScale, 1f);
+                PlaceVfx(ring, Theme.Width * 0.5f, 258f, Mathf.Lerp(160f, 880f, t), Mathf.Lerp(60f, 220f, t), 1f - t);
+                if (t > 0.72f)
+                {
+                    float fade = 1f - (t - 0.72f) / 0.28f;
+                    title.color = new Color(arenaColor.r, arenaColor.g, arenaColor.b, fade);
+                    sub.color = new Color(Theme.Text.r, Theme.Text.g, Theme.Text.b, fade);
+                }
+            });
+
+            ResetPoses();
+            _stage.SetIntroZoom(1f);
+            UnityEngine.Object.Destroy(ring.gameObject);
+            UnityEngine.Object.Destroy(banner.parent.gameObject);
+        }
+
+        /// <summary>
+        /// Transição imersiva de arena (GDD §5.6): tremor dimensional, astrolábio panorâmico com as 4 arenas no céu,
+        /// pulso em tempo real no cenário a cada giro e onda de choque elemental que transforma o campo de batalha.
+        /// </summary>
         private IEnumerator PlayArenaDraw(ArenaChanged e)
         {
             var arenas = _engine.Catalog.Arenas;
-            var dim = Ui.Box(_overlay, "ArenaRoulette", 0, 0, Theme.Width, Theme.Height, new Color(0f, 0f, 0f, 0.6f));
-            var panel = Ui.Box(dim.transform, "Panel", 380, 140, 520, 420, Theme.PanelSolid);
-            Ui.Label(panel.transform, "SORTEIO DE ARENA", 0, 10, 520, 44, 30, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold);
-            var picture = Ui.Picture(panel.transform, "Arena", Art.Arena(_view.Arena), 20, 62, 480, 270);
-            var name = Ui.Label(panel.transform, arenas[_view.Arena].Name, 0, 338, 520, 40, 30, Theme.Text, TextAnchor.MiddleCenter, FontStyle.Bold);
-            var effect = Ui.Label(panel.transform, "", 0, 380, 520, 28, 16, Theme.Muted);
-            Say("Três rodadas se passaram: a roleta decide a nova arena...");
+            Say("O campo de batalha estremece! Os elementos convergem para mudar a arena...");
 
+            // 1. Tremor dimensional na arena atual sem esconder os lutadores.
+            _stage.Shake(9.5f, 0.45f);
+            var veil = Ui.Box(_overlay, "RiftVeil", 0, 0, Theme.Width, Theme.Height, new Color(0.03f, 0.02f, 0.06f, 0f));
+            yield return Tween(0.32f, t => veil.color = new Color(0.03f, 0.02f, 0.06f, 0.34f * t));
+
+            // 2. Astrolábio panorâmico mostrando as 4 arenas lado a lado no céu da arena.
+            var strip = Ui.Frame(_overlay, "Astrolabe", 80, 122, 1120, 224, new Color(0.06f, 0.05f, 0.09f, 0.90f), Theme.BorderGold, 2f);
+            var headerLabel = Ui.Label(strip, "CONVERGÊNCIA ELEMENTAL — SORTEIO DE ARENA", 0, 6, 1116, 28, 19, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold, true);
+
+            var cardBorders = new Image[4];
+            var cardFrames = new RectTransform[4];
+            var cardPics = new RawImage[4];
+            var cardNames = new Text[4];
+
+            for (int a = 0; a < 4; a++)
+            {
+                var arenaId = (ArenaId)a;
+                var spec = arenas[arenaId];
+                Color col = Theme.ArenaColor(arenaId);
+                float cardX = 16 + a * 274;
+                var card = Ui.Frame(strip, "ArenaCard" + a, cardX, 38, 260, 172, Theme.PanelLight, Theme.BorderSubtle, 2.5f);
+                cardFrames[a] = (RectTransform)card.parent;
+                cardBorders[a] = card.parent.GetComponent<Image>();
+                cardPics[a] = Ui.Picture(card, "Thumb", Art.Arena(arenaId), 8, 8, 240, 110);
+                cardNames[a] = Ui.Label(card, spec.Name.ToUpper(), 8, 120, 240, 24, 17, col, TextAnchor.MiddleCenter, FontStyle.Bold, true);
+                Ui.Label(card, Theme.ArenaEffect(spec, _engine.Rules), 6, 142, 244, 22, 11, Theme.Text, TextAnchor.MiddleCenter);
+            }
+
+            var beacon = SpawnVfx(Art.VfxRing, Theme.Width * 0.5f, 234f, 240f, 180f, Theme.Gold);
+
+            // 3. Giro da roleta com reação ao vivo no próprio cenário de fundo.
             int current = (int)_view.Arena;
             int target = (int)e.Arena;
             int flips = 12 + (((target - current) % 4) + 4) % 4;
             for (int i = 1; i <= flips; i++)
             {
-                var id = (ArenaId)((current + i) % 4);
-                picture.texture = Art.Arena(id);
-                name.text = arenas[id].Name;
+                int activeIdx = (current + i) % 4;
+                var id = (ArenaId)activeIdx;
+                Color activeColor = Theme.ArenaColor(id);
+
+                for (int a = 0; a < 4; a++)
+                {
+                    bool isPick = a == activeIdx;
+                    cardBorders[a].color = isPick ? activeColor : Theme.BorderSubtle;
+                    cardFrames[a].localScale = isPick ? new Vector3(1.05f, 1.05f, 1f) : new Vector3(0.96f, 0.96f, 1f);
+                    cardPics[a].color = isPick ? Color.white : new Color(0.48f, 0.48f, 0.52f, 0.85f);
+                    cardNames[a].color = isPick ? Theme.Gold : Theme.Muted;
+                }
+
+                float cardCenterX = 80f + 16f + activeIdx * 274f + 130f;
+                PlaceVfx(beacon, cardCenterX, 246f, 290f, 200f, 0.78f);
+                beacon.color = new Color(activeColor.r, activeColor.g, activeColor.b, 0.78f);
+
+                // O próprio campo de batalha atrás dos lutadores pulsa com a prévia da arena candidata!
+                _stage.PreviewPulse(id, 0.28f);
+                _arenaName.text = "Sorteando: " + arenas[id].Name + "...";
+                _arenaName.color = activeColor;
+
                 float progress = i / (float)flips;
-                yield return Wait(0.05f + 0.28f * progress * progress);
+                yield return Wait(0.05f + 0.25f * progress * progress);
             }
 
+            UnityEngine.Object.Destroy(beacon.gameObject);
+
+            // 4. Travamento da arena sorteada e onda de choque que transforma o mundo!
+            var chosenSpec = arenas[e.Arena];
+            Color chosenColor = Theme.ArenaColor(e.Arena);
+            headerLabel.text = "NOVA ARENA: " + chosenSpec.Name.ToUpper() + "!";
+            headerLabel.color = chosenColor;
+            _stage.Shake(12f, 0.52f);
+
+            var lockRing = SpawnVfx(Art.VfxRing, 80f + 16f + target * 274f + 130f, 246f, 160f, 120f, chosenColor);
+            yield return Tween(0.32f, t =>
+            {
+                cardFrames[target].localScale = Vector3.Lerp(new Vector3(1.05f, 1.05f, 1f), new Vector3(1.12f, 1.12f, 1f), Mathf.Sin(t * Mathf.PI));
+                PlaceVfx(lockRing, 80f + 16f + target * 274f + 130f, 246f, Mathf.Lerp(160f, 440f, t), Mathf.Lerp(120f, 300f, t), 1f - t);
+            });
+            UnityEngine.Object.Destroy(lockRing.gameObject);
+            UnityEngine.Object.Destroy(strip.parent.gameObject);
+
+            // 5. Onda de transformação contínua do cenário e banner atmosférico.
+            var announce = Ui.Frame(_overlay, "ArenaBanner", 220, 200, 840, 102, Theme.Panel, chosenColor, 2.5f);
+            Ui.Label(announce, "ARENA ATIVA: " + chosenSpec.Name.ToUpper(), 16, 10, 808, 44, 32, chosenColor, TextAnchor.MiddleCenter, FontStyle.Bold, true);
+            Ui.Label(announce, Theme.ArenaEffect(chosenSpec, _engine.Rules), 16, 54, 808, 34, 17, Theme.Text, TextAnchor.MiddleCenter, FontStyle.Bold);
+
             Apply(e);
-            _background.texture = Art.Arena(e.Arena);
-            name.color = Theme.Gold;
-            effect.text = Theme.ArenaEffect(arenas[e.Arena], _engine.Rules);
-            Say("A arena agora é " + arenas[e.Arena].Name + "! " + effect.text);
-            yield return Wait(1.5f);
-            UnityEngine.Object.Destroy(dim.gameObject);
+            Say("O campo se transforma na arena " + chosenSpec.Name + "! " + Theme.ArenaEffect(chosenSpec, _engine.Rules));
+
+            // Pilares de sinergia nos lutadores favorecidos pela nova arena.
+            var synergyPillars = new RawImage[2];
+            for (int side = 0; side < 2; side++)
+            {
+                var activeFighter = _view.Sides[side].Active;
+                if (!activeFighter.Fainted && ArenaSystem.Multiplier(chosenSpec, activeFighter.Spec, _engine.Rules) > 1.001)
+                    synergyPillars[side] = SpawnVfx(Art.VfxPillar, _fighters[side].CenterX, _fighters[side].CenterY, 170f, 280f, chosenColor);
+            }
+
+            yield return Tween(0.78f, t =>
+            {
+                _stage.MorphStep(e.Arena, t);
+                veil.color = new Color(0.03f, 0.02f, 0.06f, 0.34f * (1f - t));
+                float pulse = Mathf.Sin(t * Mathf.PI);
+                for (int side = 0; side < 2; side++)
+                {
+                    if (synergyPillars[side] != null)
+                        PlaceVfx(synergyPillars[side], _fighters[side].CenterX, _fighters[side].CenterY - 20f * t, 175f, 300f * pulse, pulse * 0.85f);
+                }
+            });
+
+            _stage.FinishMorph(e.Arena);
+            for (int side = 0; side < 2; side++)
+                if (synergyPillars[side] != null) UnityEngine.Object.Destroy(synergyPillars[side].gameObject);
+
+            yield return Wait(0.55f);
+            UnityEngine.Object.Destroy(announce.parent.gameObject);
+            UnityEngine.Object.Destroy(veil.gameObject);
         }
 
         // ── Estado visível e utilitários ─────────────────────────────────────────
@@ -680,14 +810,25 @@ namespace ComboTactics.UI
         private void RefreshHud()
         {
             var arena = CurrentArena;
+            Color arenaColor = Theme.ArenaColor(arena.Id);
+            Color borderTint = Color.Lerp(Theme.BorderGold, arenaColor, 0.50f);
+            if (_topBorder != null) _topBorder.color = borderTint;
+            if (_dockBorder != null) _dockBorder.color = borderTint;
+
             _arenaName.text = "Arena: " + arena.Name;
+            _arenaName.color = Color.Lerp(Theme.Gold, arenaColor, 0.45f);
             _arenaEffect.text = Theme.ArenaEffect(arena, _engine.Rules);
-            _roundInfo.text = "Rodada " + _view.Round + "  ·  sorteio em " + _view.RoundsUntilArenaDraw +
-                              (_view.RoundsUntilArenaDraw == 1 ? " rodada" : " rodadas");
+            bool drawSoon = _view.RoundsUntilArenaDraw == 1;
+            _roundInfo.text = "Rodada " + _view.Round + "  ·  " +
+                              (drawSoon ? "★ SORTEIO DE ARENA NA PRÓXIMA RODADA!" : "sorteio em " + _view.RoundsUntilArenaDraw + " rodadas");
+            _roundInfo.color = drawSoon ? arenaColor : Theme.Gold;
+
             for (int side = 0; side < 2; side++)
             {
+                var active = _view.Sides[side].Active;
                 _teams[side].Refresh(_view.Sides[side], _engine.Catalog, _engine.Rules.StaminaMax);
-                _fighters[side].SetEffects(BattleText.Effects(_view.Sides[side].Active.Effects, _engine.Catalog));
+                _fighters[side].SetEffects(BattleText.Effects(active.Effects, _engine.Catalog));
+                _fighters[side].RefreshArenaSynergy(active.Spec, active.Fainted, arena, _engine.Rules);
             }
         }
 
