@@ -12,26 +12,33 @@ namespace ComboTactics.UI
         {
             // A arte do menu é 1024×559; cobre o palco inteiro com uma sobra pequena dos lados.
             Ui.Picture(Root, "Background", Art.Menu, -20, 0, 1320, 720);
-            Ui.Box(Root, "Shade", 0, 560, Theme.Width, 160, new Color(0f, 0f, 0f, 0.62f));
 
+            // Moldura inferior integrada ao escudo do torneio, sem cobrir o emblema central.
+            var dock = Ui.Frame(Root, "MenuDock", 100, 566, 1080, 104, new Color(0.06f, 0.05f, 0.08f, 0.86f), Theme.BorderGold, 2f);
             string[] labels = { "História", "Contra IA", "PvP Local", "Loja" };
+            string[] subs = { "4 fases + Boss", "Treino tático", "2 jogadores", "Itens e evolução" };
             System.Action[] actions = { App.ShowCampaign, App.ShowVsAi, App.ShowPvp, App.ShowStore };
             for (int i = 0; i < labels.Length; i++)
-                Ui.Button(Root, labels[i], 104 + i * 274, 590, 250, 66, actions[i], i == 0 ? Theme.ButtonPrimary : Theme.Button, 26);
+            {
+                float bx = 18 + i * 264;
+                var btn = Ui.Button(dock.transform, "", bx, 12, 248, 76, actions[i], i == 0 ? Theme.ButtonPrimary : Theme.Button, 24);
+                Ui.Label(btn.transform, labels[i], 8, 8, 232, 34, 24, Theme.Text, TextAnchor.MiddleCenter, FontStyle.Bold, true);
+                Ui.Label(btn.transform, subs[i], 8, 42, 232, 24, 13, i == 0 ? new Color(1f, 0.92f, 0.78f, 0.95f) : Theme.Muted);
+            }
 
-            var coins = Ui.Box(Root, "Coins", 1040, 16, 224, 44, Theme.Panel);
-            Ui.Label(coins.transform, "Moedas: " + App.Services.Profile.Coins, 0, 0, 224, 44, 22, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold);
+            var coins = Ui.Frame(Root, "Coins", 1036, 16, 224, 46, new Color(0.07f, 0.06f, 0.09f, 0.88f), Theme.BorderGold, 2f);
+            Ui.Label(coins.transform, "Moedas: " + App.Services.Profile.Coins, 0, 0, 220, 42, 21, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold, true);
 
             string warning = App.Services.Profile.StorageWarning;
             if (!string.IsNullOrEmpty(warning))
             {
-                var box = Ui.Box(Root, "Warning", 16, 16, 760, 44, Theme.Panel);
-                Ui.Label(box.transform, warning, 10, 0, 740, 44, 17, Theme.Gold);
+                var box = Ui.Frame(Root, "Warning", 16, 16, 760, 46, Theme.Panel, Theme.BorderGold);
+                Ui.Label(box.transform, warning, 10, 0, 740, 42, 16, Theme.Gold);
             }
 
-            Ui.Label(Root, "MVP 0.1 · Progresso salvo neste navegador", 20, 680, 520, 28, 15, Theme.Muted, TextAnchor.MiddleLeft);
-            Ui.Button(Root, _confirmReset ? "Confirmar: apagar tudo?" : "Zerar progresso", 1040, 676, 224, 32, ResetProgress,
-                _confirmReset ? Theme.ButtonDanger : new Color(0.16f, 0.17f, 0.22f, 0.9f), 15);
+            Ui.Label(Root, "Combo Tactics · Torneio das Arenas", 104, 680, 520, 28, 14, Theme.Muted, TextAnchor.MiddleLeft, FontStyle.Normal, true);
+            Ui.Button(Root, _confirmReset ? "Confirmar: apagar tudo?" : "Zerar progresso", 980, 678, 200, 32, ResetProgress,
+                _confirmReset ? Theme.ButtonDanger : new Color(0.12f, 0.11f, 0.16f, 0.85f), 14);
         }
 
         private void ResetProgress()

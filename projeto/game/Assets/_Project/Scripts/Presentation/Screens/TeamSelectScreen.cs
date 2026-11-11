@@ -31,10 +31,10 @@ namespace ComboTactics.UI
             int teamSize = services.Rules.MaxTeamSize;
             bool useUpgrades = !IsPvp || !services.Profile.FairPvp;
 
-            Ui.Box(Root, "Background", 0, 0, Theme.Width, Theme.Height, Theme.PanelSolid);
+            Ui.Backdrop(Root);
             string title = IsPvp ? "Equipe " + (_player + 1) + " — Jogador " + (_player + 1) : "Seleção de Personagens";
-            Ui.Label(Root, title, 30, 12, 800, 46, 32, Theme.Text, TextAnchor.MiddleLeft, FontStyle.Bold);
-            Ui.Label(Root, "Escolha " + teamSize + " lutadores. O primeiro escolhido começa na arena.", 30, 56, 800, 24, 16, Theme.Muted, TextAnchor.MiddleLeft);
+            Ui.Label(Root, title, 30, 12, 800, 44, 34, Theme.Gold, TextAnchor.MiddleLeft, FontStyle.Bold, true);
+            Ui.Label(Root, "Escolha " + teamSize + " lutadores para a arena. O 1º escolhido inicia o combate.", 30, 54, 800, 24, 16, Theme.Muted, TextAnchor.MiddleLeft);
 
             // Grade 3×3: linhas por classe, colunas por elemento.
             var characters = content.PlayableCharacters;
@@ -45,77 +45,93 @@ namespace ComboTactics.UI
                 var spec = StatsResolver.ForPlayer(def, content, services.Economy,
                     useUpgrades ? (Func<Stat, int>)(stat => services.Profile.UpgradeLevel(id, stat)) : null);
                 int order = Team.IndexOf(def.Id);
-                DrawCard(spec, def, 30 + (i % 3) * 274, 92 + (i / 3) * 172, order);
+                DrawCard(spec, def, 30 + (i % 3) * 274, 88 + (i / 3) * 172, order);
             }
 
             // Painel da direita: resumo, oponente, itens e botões.
-            var side = Ui.Box(Root, "Side", 860, 92, 390, 506, Theme.PanelLight);
-            float y = 14;
-            Ui.Label(side.transform, "Equipe (" + Team.Count + "/" + teamSize + ")", 16, y, 358, 28, 20, Theme.Text, TextAnchor.MiddleLeft, FontStyle.Bold);
-            y += 32;
+            var side = Ui.Frame(Root, "Side", 856, 88, 394, 516, Theme.Panel, Theme.BorderGold, 2f);
+            float y = 12;
+            Ui.Label(side, "EQUIPE (" + Team.Count + "/" + teamSize + ")", 16, y, 362, 26, 18, Theme.Gold, TextAnchor.MiddleLeft, FontStyle.Bold);
+            y += 30;
             for (int i = 0; i < teamSize; i++)
             {
-                string line = (i + 1) + "º  " + (i < Team.Count ? content.Character(Team[i]).Name : "—") + (i == 0 && Team.Count > 0 ? "  (começa)" : "");
-                Ui.Label(side.transform, line, 16, y, 358, 24, 17, i < Team.Count ? Theme.Text : Theme.Muted, TextAnchor.MiddleLeft);
-                y += 24;
+                bool hasMember = i < Team.Count;
+                var slot = Ui.Frame(side, "Slot" + i, 16, y, 362, 34, Theme.PanelLight,
+                    hasMember ? Theme.ElementColor(content.Character(Team[i]).Element) : Theme.BorderSubtle, 1.5f);
+                if (hasMember)
+                {
+                    var member = content.Character(Team[i]);
+                    Ui.Picture(slot, "Mini", Art.Fighter(member.Id, member.Element, member.Class), 6, 3, 28, 28);
+                    string role = i == 0 ? "1º (Líder)" : (i + 1) + "º (Reserva)";
+                    Ui.Label(slot, role + " — " + member.Name, 40, 0, 314, 34, 15, Theme.Text, TextAnchor.MiddleLeft, FontStyle.Bold);
+                }
+                else
+                {
+                    Ui.Label(slot, (i + 1) + "º Vaga aberta", 12, 0, 338, 34, 15, Theme.Muted, TextAnchor.MiddleLeft);
+                }
+                y += 38;
             }
 
-            y += 10;
-            Ui.Label(side.transform, OpponentInfo(), 16, y, 358, 92, 15, Theme.Muted, TextAnchor.UpperLeft);
-            y += 100;
+            y += 6;
+            var oppBox = Ui.Frame(side, "OpponentBox", 16, y, 362, 86, Theme.PanelLight, Theme.BorderSubtle, 1f);
+            Ui.Label(oppBox, OpponentInfo(), 10, 6, 342, 74, 14, Theme.Muted, TextAnchor.UpperLeft);
+            y += 96;
 
             if (IsPvp)
             {
-                Ui.Label(side.transform, "Itens", 16, y, 358, 28, 20, Theme.Text, TextAnchor.MiddleLeft, FontStyle.Bold);
-                Ui.Label(side.transform, "Kit fixo do PvP: 1 Kit Médico, 1 Remédio e 1 Poção de Ataque.", 16, y + 30, 358, 50, 16, Theme.Muted, TextAnchor.UpperLeft);
+                Ui.Label(side, "SUPRIMENTOS DE ARENA", 16, y, 362, 26, 17, Theme.Gold, TextAnchor.MiddleLeft, FontStyle.Bold);
+                Ui.Label(side, "Kit fixo do PvP: 1 Kit Médico, 1 Remédio e 1 Poção de Ataque.", 16, y + 28, 362, 50, 15, Theme.Muted, TextAnchor.UpperLeft);
             }
             else
             {
                 int max = services.Rules.MaxItemsPerBattle;
-                Ui.Label(side.transform, "Itens na mochila (" + TotalItems() + "/" + max + ")", 16, y, 358, 28, 20, Theme.Text, TextAnchor.MiddleLeft, FontStyle.Bold);
-                y += 34;
+                Ui.Label(side, "MOCHILA DE COMBATE (" + TotalItems() + "/" + max + ")", 16, y, 362, 26, 17, Theme.Gold, TextAnchor.MiddleLeft, FontStyle.Bold);
+                y += 30;
                 foreach (var item in content.Items)
                 {
                     string itemId = item.Id;
                     int owned = services.Profile.ItemCount(itemId);
                     int taken = Taken(itemId);
-                    Ui.Label(side.transform, item.Name + "  (tem " + owned + ")", 16, y, 210, 36, 16, owned > 0 ? Theme.Text : Theme.Muted, TextAnchor.MiddleLeft);
-                    var minus = Ui.Button(side.transform, "−", 232, y + 2, 38, 32, () => ChangeItem(itemId, -1), Theme.Button, 22);
+                    var row = Ui.Frame(side, "Item_" + itemId, 16, y, 362, 38, Theme.PanelLight, taken > 0 ? Theme.BorderGold : Theme.BorderSubtle, 1f);
+                    Ui.Label(row, item.Name + " (" + owned + ")", 10, 0, 200, 38, 15, owned > 0 ? Theme.Text : Theme.Muted, TextAnchor.MiddleLeft);
+                    var minus = Ui.Button(row, "−", 220, 3, 36, 32, () => ChangeItem(itemId, -1), Theme.Button, 20);
                     minus.interactable = taken > 0;
-                    Ui.Label(side.transform, taken.ToString(), 272, y, 40, 36, 20, Theme.Text);
-                    var plus = Ui.Button(side.transform, "+", 314, y + 2, 38, 32, () => ChangeItem(itemId, 1), Theme.Button, 22);
+                    Ui.Label(row, taken.ToString(), 258, 0, 38, 38, 18, taken > 0 ? Theme.Gold : Theme.Text, TextAnchor.MiddleCenter, FontStyle.Bold);
+                    var plus = Ui.Button(row, "+", 298, 3, 36, 32, () => ChangeItem(itemId, 1), Theme.Button, 20);
                     plus.interactable = taken < owned && TotalItems() < max;
-                    y += 40;
+                    y += 42;
                 }
             }
 
-            Ui.Button(Root, "Voltar", 30, 636, 180, 52, Back, Theme.Button);
+            Ui.Button(Root, "Voltar", 30, 628, 190, 56, Back, Theme.Button, 20);
             bool ready = Team.Count == teamSize;
-            string confirmLabel = IsPvp && _player == 0 ? "Próximo: Equipe 2" : "Lutar!";
-            var confirm = Ui.Button(Root, confirmLabel, 950, 624, 300, 70, Confirm, ready ? Theme.ButtonPrimary : Theme.Button, 28);
+            string confirmLabel = IsPvp && _player == 0 ? "Próximo: Equipe 2" : "Entrar na Arena!";
+            var confirm = Ui.Button(Root, confirmLabel, 930, 620, 320, 68, Confirm, ready ? Theme.ButtonPrimary : Theme.Button, 26);
             confirm.interactable = ready;
         }
 
         private void DrawCard(FighterSpec spec, CharacterDef def, float x, float y, int order)
         {
             bool selected = order >= 0;
-            var card = Ui.Button(Root, "", x, y, 262, 160, () => Toggle(def.Id), selected ? new Color(0.30f, 0.36f, 0.20f, 1f) : Theme.PanelLight);
+            Color elemColor = Theme.ElementColor(def.Element);
+            var card = Ui.Button(Root, "", x, y, 262, 160, () => Toggle(def.Id),
+                selected ? new Color(0.22f, 0.28f, 0.14f, 0.96f) : Theme.PanelLight);
             var t = card.transform;
-            Ui.Picture(t, "Icon", Art.Fighter(def.Id, def.Element, def.Class), 10, 10, 64, 64);
+            var portrait = Ui.Frame(t, "Portrait", 10, 10, 68, 68, new Color(0.06f, 0.05f, 0.05f, 0.9f), selected ? Theme.Good : elemColor, 2f);
+            Ui.Picture(portrait, "Icon", Art.Fighter(def.Id, def.Element, def.Class), 2, 2, 64, 64);
             if (!Art.HasSprite(def.Id))
-                Ui.Label(t, Theme.ClassLetter(def.Class), 10, 10, 64, 64, 28, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold, true);
-            Ui.Label(t, def.Name, 82, 8, 174, 26, 18, Theme.Text, TextAnchor.MiddleLeft, FontStyle.Bold);
-            Ui.Label(t, Theme.ElementName(def.Element) + " · " + Theme.ClassName(def.Class), 82, 32, 174, 20, 14, Theme.ElementColor(def.Element), TextAnchor.MiddleLeft);
-            Ui.Label(t, def.Appearance, 82, 52, 174, 20, 13, Theme.Muted, TextAnchor.MiddleLeft, FontStyle.Italic);
-            Ui.Label(t, "HP " + spec.MaxHp + "   ATQ " + spec.Attack + "   DEF " + spec.Defense + "   VEL " + spec.Speed,
-                10, 80, 244, 22, 14, Theme.Text, TextAnchor.MiddleLeft);
-            Ui.Label(t, spec.Skills[0].Name + " · " + spec.Skills[1].Name, 10, 102, 244, 20, 12, Theme.Muted, TextAnchor.MiddleLeft);
-            Ui.Label(t, "Especial: " + spec.Skills[2].Name, 10, 122, 244, 20, 12, Theme.Gold, TextAnchor.MiddleLeft);
+                Ui.Label(portrait, Theme.ClassLetter(def.Class), 0, 0, 68, 68, 28, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold, true);
+            Ui.Label(t, def.Name, 86, 8, 170, 26, 18, Theme.Text, TextAnchor.MiddleLeft, FontStyle.Bold, true);
+            Ui.Label(t, Theme.ElementName(def.Element) + " · " + Theme.ClassName(def.Class), 86, 32, 170, 20, 14, elemColor, TextAnchor.MiddleLeft, FontStyle.Bold);
+            Ui.Label(t, def.Appearance, 86, 52, 170, 20, 12, Theme.Muted, TextAnchor.MiddleLeft, FontStyle.Italic);
+            Ui.Label(t, "HP " + spec.MaxHp + "  ATQ " + spec.Attack + "  DEF " + spec.Defense + "  VEL " + spec.Speed,
+                10, 82, 244, 22, 13, Theme.Text, TextAnchor.MiddleLeft, FontStyle.Bold);
+            Ui.Label(t, spec.Skills[0].Name + " · " + spec.Skills[1].Name, 10, 104, 244, 20, 12, Theme.Muted, TextAnchor.MiddleLeft);
+            Ui.Label(t, "★ " + spec.Skills[2].Name, 10, 124, 244, 20, 12, Theme.Gold, TextAnchor.MiddleLeft, FontStyle.Bold);
             if (selected)
             {
-                // Selo com a ordem de entrada, no canto do ícone para não cobrir o nome.
-                var badge = Ui.Box(t, "Order", 48, 50, 34, 26, Theme.ButtonPrimary);
-                Ui.Label(badge.transform, (order + 1) + "º", 0, 0, 34, 26, 16, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold);
+                var badge = Ui.Frame(t, "Order", 50, 54, 34, 26, Theme.ButtonPrimary, Theme.Gold, 1.5f);
+                Ui.Label(badge, (order + 1) + "º", 0, 0, 34, 26, 15, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold, true);
             }
         }
 

@@ -63,6 +63,25 @@ namespace ComboTactics.UI
             return image;
         }
 
+        /// <summary>Painel com moldura metálica/elemental e brilho interno no topo, integrado à estética de arena.</summary>
+        public static RectTransform Frame(Transform parent, string name, float x, float y, float w, float h, Color fill, Color border, float thickness = 2f)
+        {
+            var outer = Box(parent, name + "Border", x, y, w, h, border);
+            var inner = Box(outer.transform, name, thickness, thickness, w - thickness * 2f, h - thickness * 2f, fill);
+            Box(inner.transform, "Highlight", 0f, 0f, w - thickness * 2f, 1.5f, new Color(1f, 0.95f, 0.85f, 0.10f));
+            return inner.rectTransform;
+        }
+
+        /// <summary>Fundo atmosférico usando a arte do torneio escurecida, evitando telas chapadas.</summary>
+        public static void Backdrop(Transform parent, Texture customArt = null, float brightness = 0.24f)
+        {
+            Box(parent, "Base", 0, 0, Theme.Width, Theme.Height, new Color(0.05f, 0.04f, 0.07f, 1f));
+            var pic = Picture(parent, "BackdropArt", customArt != null ? customArt : Art.Menu, -20, 0, 1320, 720);
+            pic.color = new Color(brightness, brightness * 0.95f, brightness * 1.05f, 1f);
+            Box(parent, "TopVignette", 0, 0, Theme.Width, 84, new Color(0.04f, 0.03f, 0.06f, 0.72f));
+            Box(parent, "BottomBar", 0, 78, Theme.Width, 2, Theme.BorderSubtle);
+        }
+
         public static RawImage Picture(Transform parent, string name, Texture texture, float x, float y, float w, float h)
         {
             var rt = Node(parent, name, x, y, w, h);
@@ -102,14 +121,21 @@ namespace ComboTactics.UI
             var image = Box(parent, "Button", x, y, w, h, color);
             image.raycastTarget = true;
 
+            bool isPrimary = Mathf.Abs(color.r - Theme.ButtonPrimary.r) < 0.08f && Mathf.Abs(color.g - Theme.ButtonPrimary.g) < 0.08f;
+            Color rim = isPrimary ? Theme.Gold : new Color(0.58f, 0.50f, 0.38f, 0.55f);
+            var outline = image.gameObject.AddComponent<Outline>();
+            outline.effectColor = rim;
+            outline.effectDistance = new Vector2(1.5f, -1.5f);
+            Box(image.transform, "TopGloss", 2f, 2f, Mathf.Max(0f, w - 4f), Mathf.Min(3f, h * 0.12f), new Color(1f, 0.95f, 0.85f, isPrimary ? 0.22f : 0.08f));
+
             var button = image.gameObject.AddComponent<Button>();
             button.targetGraphic = image;
             var colors = button.colors;
             colors.normalColor = Color.white;
-            colors.highlightedColor = new Color(0.84f, 0.84f, 0.84f, 1f);
-            colors.pressedColor = new Color(0.66f, 0.66f, 0.66f, 1f);
+            colors.highlightedColor = new Color(1.12f, 1.10f, 1.05f, 1f);
+            colors.pressedColor = new Color(0.75f, 0.72f, 0.68f, 1f);
             colors.selectedColor = Color.white;
-            colors.disabledColor = new Color(0.42f, 0.42f, 0.42f, 0.75f);
+            colors.disabledColor = new Color(0.42f, 0.40f, 0.44f, 0.65f);
             colors.fadeDuration = 0.06f;
             button.colors = colors;
             var navigation = button.navigation;
@@ -117,7 +143,8 @@ namespace ComboTactics.UI
             button.navigation = navigation;
 
             if (onClick != null) button.onClick.AddListener(() => Click(onClick));
-            Label(image.transform, label, 6f, 0f, w - 12f, h, fontSize, Theme.Text);
+            if (!string.IsNullOrEmpty(label))
+                Label(image.transform, label, 6f, 0f, w - 12f, h, fontSize, Theme.Text, TextAnchor.MiddleCenter, FontStyle.Bold, true);
             return button;
         }
 
@@ -162,6 +189,9 @@ namespace ComboTactics.UI
         public UiBar(Transform parent, float x, float y, float w, float h, Color fillColor)
         {
             var back = Ui.Box(parent, "Bar", x, y, w, h, Theme.BarBack);
+            var rim = back.gameObject.AddComponent<Outline>();
+            rim.effectColor = new Color(0.45f, 0.38f, 0.28f, 0.65f);
+            rim.effectDistance = new Vector2(1f, -1f);
             _width = w - 4f;
             _height = h - 4f;
             _fillImage = Ui.Box(back.transform, "Fill", 2f, 2f, _width, _height, fillColor);

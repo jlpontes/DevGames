@@ -17,8 +17,8 @@ namespace ComboTactics.UI
         /// <summary>Multiplicador das animações (1× ou 2×). Não afeta o QTE.</summary>
         public static float Speed = 1f;
 
-        private static readonly float[] FighterX = { 340f, 940f };
-        private const float FighterY = 420f;
+        private static readonly float[] FighterX = { 370f, 910f };
+        private const float FighterY = 396f;
 
         private readonly Match _match;
         private BattleEngine _engine;
@@ -55,27 +55,28 @@ namespace ComboTactics.UI
 
             for (int side = 0; side < 2; side++)
             {
-                _teams[side] = new TeamPanel(Root, side == 0 ? 14 : 826, 10, _match.SideNames[side], _view.Sides[side].Team.Length);
                 _fighters[side] = new FighterWidget(Root, FighterX[side], FighterY);
+                _teams[side] = new TeamPanel(Root, side == 0 ? 16 : 836, 10, _match.SideNames[side], _view.Sides[side].Team.Length);
             }
 
-            var top = Ui.Box(Root, "ArenaInfo", 464, 10, 352, 88, Theme.Panel);
-            _arenaName = Ui.Label(top.transform, "", 0, 4, 352, 30, 22, Theme.Text, TextAnchor.MiddleCenter, FontStyle.Bold);
-            _arenaEffect = Ui.Label(top.transform, "", 6, 34, 340, 22, 13, Theme.Muted);
-            _roundInfo = Ui.Label(top.transform, "", 0, 58, 352, 24, 15, Theme.Gold);
+            var top = Ui.Frame(Root, "ArenaInfo", 456, 10, 368, 104, Theme.Panel, Theme.BorderGold, 2f);
+            _arenaName = Ui.Label(top, "", 8, 2, 352, 26, 20, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold, true);
+            _arenaEffect = Ui.Label(top, "", 8, 26, 352, 20, 12, Theme.Text);
+            _roundInfo = Ui.Label(top, "", 8, 46, 352, 20, 13, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold);
 
-            var speed = Ui.Button(Root, "", 464, 102, 172, 28, ToggleSpeed, new Color(0.12f, 0.14f, 0.20f, 0.92f), 14);
+            var speed = Ui.Button(top, "", 10, 68, 168, 28, ToggleSpeed, Theme.Button, 13);
             _speedLabel = speed.GetComponentInChildren<Text>();
-            var quit = Ui.Button(Root, "", 644, 102, 172, 28, Quit, new Color(0.12f, 0.14f, 0.20f, 0.92f), 14);
+            var quit = Ui.Button(top, "", 190, 68, 168, 28, Quit, Theme.Button, 13);
             _quitLabel = quit.GetComponentInChildren<Text>();
             _speedLabel.text = "Velocidade: " + Speed + "×";
             _quitLabel.text = "Desistir";
 
-            var messageBox = Ui.Box(Root, "Message", 190, 544, 900, 46, Theme.Panel);
-            _message = Ui.Label(messageBox.transform, "", 10, 0, 880, 46, 20, Theme.Text);
+            var dock = Ui.Frame(Root, "CombatDock", 16, 566, 1248, 144, Theme.Panel, Theme.BorderGold, 2f);
+            var msgStrip = Ui.Box(dock, "MessageStrip", 4, 4, 1236, 32, new Color(0.05f, 0.04f, 0.04f, 0.72f));
+            Ui.Box(dock, "Divider", 4, 36, 1236, 1.5f, Theme.BorderSubtle);
+            _message = Ui.Label(msgStrip.transform, "", 14, 0, 1208, 32, 18, Theme.Text, TextAnchor.MiddleCenter, FontStyle.Bold, true);
 
-            Ui.Box(Root, "MenuBack", 0, 598, Theme.Width, 122, Theme.Panel);
-            _menu = Ui.Node(Root, "Menu", 0, 598, Theme.Width, 122);
+            _menu = Ui.Node(Root, "Menu", 16, 604, 1248, 106);
             _overlay = Ui.Node(Root, "Overlay", 0, 0, Theme.Width, Theme.Height);
 
             RefreshHud();
@@ -147,14 +148,15 @@ namespace ComboTactics.UI
         {
             var cover = Ui.Box(_overlay, "PassDevice", 0, 0, Theme.Width, Theme.Height, Theme.PanelSolid);
             cover.raycastTarget = true;
-            Ui.Label(cover.transform, "Passe o aparelho para", 0, 200, Theme.Width, 40, 28, Theme.Muted);
-            Ui.Label(cover.transform, _match.SideNames[side], 0, 244, Theme.Width, 80, 64, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold);
-            Ui.Label(cover.transform, "O outro jogador não pode ver a sua escolha.", 0, 334, Theme.Width, 30, 20, Theme.Text);
-            Ui.Button(cover.transform, "Estou pronto", 490, 420, 300, 70, () =>
+            var card = Ui.Frame(cover.transform, "PassCard", 280, 170, 720, 380, Theme.Panel, Theme.BorderGold, 2.5f);
+            Ui.Label(card, "Passe o aparelho para", 20, 36, 680, 36, 26, Theme.Muted);
+            Ui.Label(card, _match.SideNames[side], 20, 82, 680, 80, 56, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold, true);
+            Ui.Label(card, "O outro jogador não pode ver a sua escolha de turno.", 20, 174, 680, 30, 18, Theme.Text);
+            Ui.Button(card, "Estou pronto", 210, 250, 300, 68, () =>
             {
                 UnityEngine.Object.Destroy(cover.gameObject);
                 onReady();
-            }, Theme.ButtonPrimary, 28);
+            }, Theme.ButtonPrimary, 26);
         }
 
         private void ShowActionMenu(int side, Action<ICommand> reply)
@@ -162,7 +164,7 @@ namespace ComboTactics.UI
             Ui.Clear(_menu);
             var state = _engine.State.Sides[side];
             var active = state.Active;
-            Ui.Label(_menu, _match.SideNames[side] + ": escolha a ação de " + active.Spec.Name, 20, 4, 900, 24, 16, Theme.Gold, TextAnchor.MiddleLeft, FontStyle.Bold);
+            Ui.Label(_menu, _match.SideNames[side] + " — Escolha a ação de " + active.Spec.Name, 16, 2, 900, 22, 15, Theme.Gold, TextAnchor.MiddleLeft, FontStyle.Bold);
 
             for (int i = 0; i < active.Spec.Skills.Count; i++)
             {
@@ -171,20 +173,20 @@ namespace ComboTactics.UI
                 int damage = _engine.PreviewDamage(side, i).Amount;
                 string hint = Theme.SkillHint(skill, _engine.Catalog);
                 string label = skill.Name + "\n~" + damage + " de dano" + (hint.Length > 0 ? " · " + hint : "");
-                if (skill.IsSpecial) label = "ESPECIAL: " + label;
+                if (skill.IsSpecial) label = "★ ESPECIAL: " + label;
 
                 bool legal = _engine.IsLegal(command);
-                if (skill.IsSpecial && !legal) label = "ESPECIAL: " + skill.Name + "\nStamina " + state.Stamina + " / " + _engine.Rules.StaminaMax;
-                var button = Ui.Button(_menu, label, 20 + i * 256, 32, 246, 80, () => Choose(command, reply),
-                    skill.IsSpecial ? Theme.ButtonPrimary : Theme.Button, 15);
+                if (skill.IsSpecial && !legal) label = "★ ESPECIAL: " + skill.Name + "\nStamina " + state.Stamina + " / " + _engine.Rules.StaminaMax;
+                var button = Ui.Button(_menu, label, 14 + i * 254, 26, 244, 72, () => Choose(command, reply),
+                    skill.IsSpecial ? Theme.ButtonPrimary : Theme.Button, 14);
                 button.interactable = legal;
             }
 
             bool hasItems = false;
             foreach (var pair in state.Items) if (pair.Value > 0) hasItems = true;
-            var bag = Ui.Button(_menu, "Mochila", 800, 32, 220, 80, () => ShowItemMenu(side, reply), Theme.Button, 20);
+            var bag = Ui.Button(_menu, "Mochila", 784, 26, 216, 72, () => ShowItemMenu(side, reply), Theme.Button, 19);
             bag.interactable = hasItems;
-            var swap = Ui.Button(_menu, "Trocar\nPersonagem", 1034, 32, 226, 80, () => ShowSwitchMenu(side, reply), Theme.Button, 18);
+            var swap = Ui.Button(_menu, "Trocar\nLutador", 1012, 26, 220, 72, () => ShowSwitchMenu(side, reply), Theme.Button, 17);
             swap.interactable = state.HasBenchAlive;
         }
 
@@ -192,37 +194,37 @@ namespace ComboTactics.UI
         {
             Ui.Clear(_menu);
             var state = _engine.State.Sides[side];
-            Ui.Label(_menu, "Mochila: usar um item gasta o turno", 20, 4, 900, 24, 16, Theme.Gold, TextAnchor.MiddleLeft, FontStyle.Bold);
+            Ui.Label(_menu, "Mochila — Usar um item consome o turno", 16, 2, 900, 22, 15, Theme.Gold, TextAnchor.MiddleLeft, FontStyle.Bold);
             int column = 0;
             foreach (var pair in state.Items)
             {
                 if (pair.Value <= 0) continue;
                 var item = _engine.Catalog.Items[pair.Key];
                 var command = new UseItemCommand(side, item.Id);
-                var button = Ui.Button(_menu, item.Name + "  ×" + pair.Value + "\n" + item.Description, 20 + column * 256, 32, 246, 80,
+                var button = Ui.Button(_menu, item.Name + "  ×" + pair.Value + "\n" + item.Description, 14 + column * 254, 26, 244, 72,
                     () => Choose(command, reply), Theme.Button, 14);
                 button.interactable = _engine.IsLegal(command);
                 column++;
             }
-            Ui.Button(_menu, "Voltar", 1034, 32, 226, 80, () => ShowActionMenu(side, reply), Theme.Button, 20);
+            Ui.Button(_menu, "Voltar", 1012, 26, 220, 72, () => ShowActionMenu(side, reply), Theme.Button, 19);
         }
 
         private void ShowSwitchMenu(int side, Action<ICommand> reply)
         {
             Ui.Clear(_menu);
             var state = _engine.State.Sides[side];
-            Ui.Label(_menu, "Trocar Personagem: a troca acontece antes dos ataques", 20, 4, 900, 24, 16, Theme.Gold, TextAnchor.MiddleLeft, FontStyle.Bold);
+            Ui.Label(_menu, "Trocar Lutador — A troca ocorre no início do turno", 16, 2, 900, 22, 15, Theme.Gold, TextAnchor.MiddleLeft, FontStyle.Bold);
             int column = 0;
             for (int i = 0; i < state.Team.Length; i++)
             {
                 if (i == state.ActiveIndex) continue;
                 var command = new SwitchCommand(side, i);
-                var button = Ui.Button(_menu, BenchLabel(state.Team[i]), 20 + column * 336, 32, 326, 80, () => Choose(command, reply),
-                    Theme.ElementColor(state.Team[i].Spec.Element) * 0.7f, 15);
+                var button = Ui.Button(_menu, BenchLabel(state.Team[i]), 14 + column * 336, 26, 324, 72, () => Choose(command, reply),
+                    Theme.ElementColor(state.Team[i].Spec.Element) * 0.72f, 15);
                 button.interactable = _engine.IsLegal(command);
                 column++;
             }
-            Ui.Button(_menu, "Voltar", 1034, 32, 226, 80, () => ShowActionMenu(side, reply), Theme.Button, 20);
+            Ui.Button(_menu, "Voltar", 1012, 26, 220, 72, () => ShowActionMenu(side, reply), Theme.Button, 19);
         }
 
         private static string BenchLabel(Fighter fighter)
@@ -243,10 +245,10 @@ namespace ComboTactics.UI
         public void AskForcedSwitch(int side, Action<int> reply)
         {
             var state = _engine.State.Sides[side];
-            var dim = Ui.Box(_overlay, "ForcedSwitch", 0, 0, Theme.Width, Theme.Height, new Color(0f, 0f, 0f, 0.55f));
+            var dim = Ui.Box(_overlay, "ForcedSwitch", 0, 0, Theme.Width, Theme.Height, new Color(0f, 0f, 0f, 0.60f));
             dim.raycastTarget = true;
-            var panel = Ui.Box(dim.transform, "Panel", 290, 220, 700, 260, Theme.PanelSolid);
-            Ui.Label(panel.transform, _match.SideNames[side] + ": escolha quem entra na arena", 10, 16, 680, 40, 26, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold);
+            var panel = Ui.Frame(dim.transform, "Panel", 290, 220, 700, 260, Theme.Panel, Theme.BorderGold, 2.5f);
+            Ui.Label(panel, _match.SideNames[side] + " — Escolha quem entra na arena", 10, 16, 680, 40, 26, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold, true);
 
             var options = new List<int>();
             for (int i = 0; i < state.Team.Length; i++)
@@ -256,11 +258,11 @@ namespace ComboTactics.UI
                 int index = options[n];
                 float width = options.Count == 1 ? 400f : 320f;
                 float x = options.Count == 1 ? 150f : 20f + n * 340f;
-                Ui.Button(panel.transform, BenchLabel(state.Team[index]), x, 90, width, 110, () =>
+                Ui.Button(panel, BenchLabel(state.Team[index]), x, 90, width, 110, () =>
                 {
                     UnityEngine.Object.Destroy(dim.gameObject);
                     reply(index);
-                }, Theme.ElementColor(state.Team[index].Spec.Element) * 0.7f, 18);
+                }, Theme.ElementColor(state.Team[index].Spec.Element) * 0.72f, 18);
             }
         }
 

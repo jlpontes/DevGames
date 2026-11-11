@@ -28,14 +28,15 @@ namespace ComboTactics.UI
         }
     }
 
-    /// <summary>Lutador ativo na arena: forma colorida, placa de nome, barra de HP e efeitos.</summary>
+    /// <summary>Lutador ativo na arena: sombra no chão, sprite e pedestal compacto sob os pés.</summary>
     public sealed class FighterWidget
     {
-        private const float BodySize = 190f;
-        private const float PlateWidth = 290f;
+        private const float BodySize = 200f;
+        private const float PlateWidth = 268f;
 
         private readonly RectTransform _body;
         private readonly RawImage _sprite;
+        private readonly Image _plateBorder;
         private readonly Text _letter;
         private readonly Text _name;
         private readonly Text _sub;
@@ -53,13 +54,11 @@ namespace ComboTactics.UI
         {
             CenterX = centerX;
             CenterY = centerY;
-            float left = centerX - PlateWidth * 0.5f;
-            var plate = Ui.Box(parent, "Plate", left, centerY - 196f, PlateWidth, 94f, Theme.Panel);
-            _name = Ui.Label(plate.transform, "", 8, 2, PlateWidth - 16, 26, 19, Theme.Text, TextAnchor.MiddleCenter, FontStyle.Bold);
-            _sub = Ui.Label(plate.transform, "", 8, 26, PlateWidth - 16, 18, 13, Theme.Muted);
-            _hp = new UiBar(plate.transform, 8, 46, PlateWidth - 16, 22, Theme.Good);
-            _hpText = Ui.Label(plate.transform, "", 8, 46, PlateWidth - 16, 22, 14, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold, true);
-            _effects = Ui.Label(plate.transform, "", 8, 70, PlateWidth - 16, 20, 13, Theme.Gold);
+
+            // Sombra elíptica projetada no piso da arena para ancorar o personagem no cenário.
+            var shadow = Ui.Picture(parent, "Shadow", Art.VfxOrb, 0, 0, 168f, 34f);
+            shadow.color = new Color(0f, 0f, 0f, 0.48f);
+            Ui.PlaceCentered(shadow.rectTransform, centerX, centerY + 84f, 168f, 34f);
 
             _body = Ui.Node(parent, "Body", 0, 0, BodySize, BodySize);
             Ui.PlaceCentered(_body, centerX, centerY, BodySize, BodySize);
@@ -68,6 +67,20 @@ namespace ComboTactics.UI
             // O lutador da direita é espelhado para os dois ficarem de frente um para o outro.
             if (centerX > Theme.Width * 0.5f) _sprite.uvRect = new Rect(1f, 0f, -1f, 1f);
             _letter = Ui.Label(_body, "", 0, 0, BodySize, BodySize, 64, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold, true);
+
+            // Pedestal de status posicionado sob os pés do lutador, deixando o céu da arena livre.
+            float left = centerX - PlateWidth * 0.5f;
+            float plateY = centerY + 94f;
+            var borderBox = Ui.Box(parent, "PlateFrame", left, plateY, PlateWidth, 68f, Theme.BorderGold);
+            _plateBorder = borderBox;
+            var plate = Ui.Box(borderBox.transform, "Plate", 2f, 2f, PlateWidth - 4f, 64f, Theme.Panel);
+            Ui.Box(plate.transform, "Gloss", 0f, 0f, PlateWidth - 4f, 2f, new Color(1f, 0.92f, 0.72f, 0.16f));
+
+            _name = Ui.Label(plate.transform, "", 8, 2, 152, 20, 15, Theme.Text, TextAnchor.MiddleLeft, FontStyle.Bold, true);
+            _sub = Ui.Label(plate.transform, "", 160, 3, PlateWidth - 170, 18, 11, Theme.Muted, TextAnchor.MiddleRight, FontStyle.Bold);
+            _hp = new UiBar(plate.transform, 8, 24, PlateWidth - 20, 18, Theme.Good);
+            _hpText = Ui.Label(plate.transform, "", 8, 24, PlateWidth - 20, 18, 12, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold, true);
+            _effects = Ui.Label(plate.transform, "", 8, 44, PlateWidth - 20, 18, 12, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold);
         }
 
         public void Show(BattleSnapshot.FighterView fighter, BattleCatalog catalog)
@@ -77,7 +90,9 @@ namespace ComboTactics.UI
             _sprite.texture = Art.Fighter(spec.Id, spec.Element, spec.Class);
             _letter.text = Art.HasSprite(spec.Id) ? "" : Theme.ClassLetter(spec.Class);
             _name.text = spec.Name;
-            _sub.text = Theme.ElementName(spec.Element) + " · " + Theme.ClassName(spec.Class) + " · ATQ " + spec.Attack + " DEF " + spec.Defense + " VEL " + spec.Speed;
+            _sub.text = Theme.ElementName(spec.Element) + " · " + Theme.ClassName(spec.Class);
+            _sub.color = Theme.ElementColor(spec.Element);
+            _plateBorder.color = Theme.ElementColor(spec.Element);
             _effects.text = BattleText.Effects(fighter.Effects, catalog);
             SetHp(fighter.Hp);
             SetAlpha(fighter.Fainted ? 0.25f : 1f);
@@ -121,34 +136,39 @@ namespace ComboTactics.UI
     /// <summary>Painel de um jogador: barra de stamina e os três lutadores (ativo destacado, banco com HP e status).</summary>
     public sealed class TeamPanel
     {
-        private const float ChipWidth = 136f;
+        private const float ChipWidth = 132f;
 
         private readonly Text _title;
         private readonly UiBar _stamina;
         private readonly Text _staminaText;
         private readonly Image[] _chips;
+        private readonly RawImage[] _icons;
         private readonly Text[] _names;
         private readonly UiBar[] _hp;
         private readonly Text[] _effects;
 
         public TeamPanel(Transform parent, float x, float y, string title, int teamSize)
         {
-            var panel = Ui.Box(parent, "TeamPanel", x, y, 440, 120, Theme.Panel);
-            _title = Ui.Label(panel.transform, title, 10, 4, 420, 22, 16, Theme.Text, TextAnchor.MiddleLeft, FontStyle.Bold);
-            _stamina = new UiBar(panel.transform, 10, 28, 420, 22, Theme.Stamina);
-            _staminaText = Ui.Label(panel.transform, "", 10, 28, 420, 22, 13, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold, true);
+            var panel = Ui.Frame(parent, "TeamPanel", x, y, 428, 104, Theme.Panel, Theme.BorderGold, 2f);
+            _title = Ui.Label(panel, title, 10, 4, 184, 24, 16, Theme.Gold, TextAnchor.MiddleLeft, FontStyle.Bold, true);
+            _stamina = new UiBar(panel, 198, 6, 218, 20, Theme.Stamina);
+            _staminaText = Ui.Label(panel, "", 198, 6, 218, 20, 12, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold, true);
 
             _chips = new Image[teamSize];
+            _icons = new RawImage[teamSize];
             _names = new Text[teamSize];
             _hp = new UiBar[teamSize];
             _effects = new Text[teamSize];
             for (int i = 0; i < teamSize; i++)
             {
-                _chips[i] = Ui.Box(panel.transform, "Chip" + i, 10 + i * (ChipWidth + 6), 56, ChipWidth, 58, Theme.PanelLight);
+                float chipX = 10 + i * (ChipWidth + 6);
+                var border = Ui.Box(panel, "ChipBorder" + i, chipX, 32, ChipWidth, 64, Theme.BorderSubtle);
+                _chips[i] = Ui.Box(border.transform, "Chip" + i, 1.5f, 1.5f, ChipWidth - 3f, 61f, Theme.PanelLight);
                 var t = _chips[i].transform;
-                _names[i] = Ui.Label(t, "", 4, 2, ChipWidth - 8, 18, 12, Theme.Text, TextAnchor.MiddleCenter, FontStyle.Bold);
-                _hp[i] = new UiBar(t, 6, 22, ChipWidth - 12, 12, Theme.Good);
-                _effects[i] = Ui.Label(t, "", 4, 36, ChipWidth - 8, 18, 11, Theme.Gold);
+                _icons[i] = Ui.Picture(t, "Icon", null, 4, 4, 34, 34);
+                _names[i] = Ui.Label(t, "", 42, 3, ChipWidth - 48, 18, 12, Theme.Text, TextAnchor.MiddleLeft, FontStyle.Bold, true);
+                _hp[i] = new UiBar(t, 42, 23, ChipWidth - 50, 12, Theme.Good);
+                _effects[i] = Ui.Label(t, "", 4, 41, ChipWidth - 10, 16, 11, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold);
             }
         }
 
@@ -156,7 +176,7 @@ namespace ComboTactics.UI
         {
             _stamina.Set(side.Stamina / (float)staminaMax);
             bool ready = side.Stamina >= staminaMax;
-            _staminaText.text = ready ? "ESPECIAL PRONTO!" : "Stamina " + side.Stamina + " / " + staminaMax;
+            _staminaText.text = ready ? "★ ESPECIAL PRONTO!" : "Stamina " + side.Stamina + " / " + staminaMax;
             _stamina.SetColor(ready ? Theme.ButtonPrimary : Theme.Stamina);
 
             for (int i = 0; i < _chips.Length; i++)
@@ -164,13 +184,21 @@ namespace ComboTactics.UI
                 var fighter = side.Team[i];
                 bool active = i == side.ActiveIndex;
                 float fraction = fighter.Hp / (float)fighter.Spec.MaxHp;
+                _icons[i].texture = Art.Fighter(fighter.Spec.Id, fighter.Spec.Element, fighter.Spec.Class);
+                _icons[i].color = fighter.Fainted ? new Color(1f, 1f, 1f, 0.35f) : Color.white;
                 _names[i].text = fighter.Spec.Name;
                 _names[i].color = fighter.Fainted ? Theme.Muted : Theme.Text;
                 _hp[i].Set(fraction);
                 _hp[i].SetColor(Theme.HpColor(fraction));
-                _effects[i].text = fighter.Fainted ? "derrotado" : BattleText.Effects(fighter.Effects, catalog);
-                _effects[i].color = fighter.Fainted ? Theme.Bad : Theme.Gold;
-                Color color = fighter.Fainted ? new Color(0.10f, 0.10f, 0.12f, 0.9f) : active ? Theme.ElementColor(fighter.Spec.Element) * 0.6f : Theme.PanelLight;
+                string statusText = fighter.Fainted ? "DERROTADO" : BattleText.Effects(fighter.Effects, catalog);
+                if (!fighter.Fainted && statusText.Length == 0 && active) statusText = "EM COMBATE";
+                _effects[i].text = statusText;
+                _effects[i].color = fighter.Fainted ? Theme.Bad : active && fighter.Effects.Count == 0 ? Theme.Good : Theme.Gold;
+                Color color = fighter.Fainted
+                    ? new Color(0.08f, 0.07f, 0.08f, 0.92f)
+                    : active
+                        ? Color.Lerp(Theme.PanelLight, Theme.ElementColor(fighter.Spec.Element), 0.38f)
+                        : Theme.PanelLight;
                 color.a = 0.95f;
                 _chips[i].color = color;
             }

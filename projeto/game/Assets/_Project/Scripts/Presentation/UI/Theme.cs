@@ -9,19 +9,21 @@ namespace ComboTactics.UI
         public const float Width = 1280f;
         public const float Height = 720f;
 
-        public static readonly Color Panel = new Color(0.05f, 0.06f, 0.10f, 0.84f);
-        public static readonly Color PanelSolid = new Color(0.08f, 0.09f, 0.13f, 1f);
-        public static readonly Color PanelLight = new Color(0.16f, 0.18f, 0.25f, 0.95f);
-        public static readonly Color Button = new Color(0.20f, 0.25f, 0.36f, 1f);
-        public static readonly Color ButtonPrimary = new Color(0.80f, 0.42f, 0.08f, 1f);
-        public static readonly Color ButtonDanger = new Color(0.55f, 0.17f, 0.17f, 1f);
-        public static readonly Color Text = new Color(0.96f, 0.96f, 0.93f, 1f);
-        public static readonly Color Muted = new Color(0.72f, 0.75f, 0.82f, 1f);
-        public static readonly Color Good = new Color(0.36f, 0.86f, 0.46f, 1f);
-        public static readonly Color Bad = new Color(0.96f, 0.36f, 0.30f, 1f);
-        public static readonly Color Gold = new Color(1f, 0.84f, 0.25f, 1f);
-        public static readonly Color Stamina = new Color(0.98f, 0.78f, 0.18f, 1f);
-        public static readonly Color BarBack = new Color(0f, 0f, 0f, 0.65f);
+        public static readonly Color Panel = new Color(0.07f, 0.06f, 0.10f, 0.88f);
+        public static readonly Color PanelSolid = new Color(0.09f, 0.08f, 0.12f, 0.96f);
+        public static readonly Color PanelLight = new Color(0.14f, 0.13f, 0.19f, 0.92f);
+        public static readonly Color BorderGold = new Color(0.76f, 0.56f, 0.24f, 0.88f);
+        public static readonly Color BorderSubtle = new Color(0.36f, 0.32f, 0.28f, 0.75f);
+        public static readonly Color Button = new Color(0.18f, 0.17f, 0.24f, 0.96f);
+        public static readonly Color ButtonPrimary = new Color(0.78f, 0.38f, 0.10f, 1f);
+        public static readonly Color ButtonDanger = new Color(0.58f, 0.16f, 0.16f, 1f);
+        public static readonly Color Text = new Color(0.96f, 0.94f, 0.89f, 1f);
+        public static readonly Color Muted = new Color(0.74f, 0.71f, 0.66f, 1f);
+        public static readonly Color Good = new Color(0.34f, 0.84f, 0.44f, 1f);
+        public static readonly Color Bad = new Color(0.94f, 0.34f, 0.28f, 1f);
+        public static readonly Color Gold = new Color(0.98f, 0.80f, 0.28f, 1f);
+        public static readonly Color Stamina = new Color(0.96f, 0.74f, 0.18f, 1f);
+        public static readonly Color BarBack = new Color(0.03f, 0.03f, 0.05f, 0.82f);
 
         public static Color ElementColor(Element element)
         {
