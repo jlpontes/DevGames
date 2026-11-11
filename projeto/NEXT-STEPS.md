@@ -13,8 +13,8 @@
 | Design de jogo (GDD, caderno, mecânicas) | Completo. As lacunas de regra foram fechadas em [GDD §5.7](pt-br/GDD.md#57-esclarecimentos-de-regras) (R1–R10) e o escopo do MVP está em [GDD §6](pt-br/GDD.md#6-escopo-do-mvp) |
 | Level design | 1 de 4 fases documentada (Treinador de Água), igual em en e pt-br |
 | Arquitetura | [ARCHITECTURE.md](pt-br/architecture/ARCHITECTURE.md), [SYSTEM-DESIGN.md](pt-br/architecture/SYSTEM-DESIGN.md), 5 ADRs, em pt-br e en. Ainda na branch `docs/architecture` |
-| Implementação | MVP em [`game/`](game/README.md) (11/11/2026): núcleo de batalha, IA, campanha, contra IA, PvP local, loja e save, com arte placeholder. Núcleo com 102 testes passando; a interface ainda precisa ser validada no editor do Unity |
-| Arte e áudio | Logo, menu e 4 arenas prontos. **Faltam os 9 personagens, o Boss e todos os sons** |
+| Implementação | MVP em [`game/`](game/README.md) (11/11/2026): núcleo de batalha, IA, campanha, contra IA, PvP local, loja e save, com sprites provisórios dos lutadores. Roda no Unity 6000.0.23f1 e tem 102 testes passando. Faltam a afinidade e o espectro (R11), os cartões de história (R12) e o build WebGL |
+| Arte e áudio | Logo, menu e 4 arenas prontos. Os 9 personagens e o Boss têm sprites provisórios, recortados de imagens de referência (parte é arte de terceiros). **Faltam a arte final dos personagens e todos os sons** |
 
 ### Incoerências resolvidas em 02/10/2026
 

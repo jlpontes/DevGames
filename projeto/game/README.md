@@ -6,9 +6,9 @@ Versão jogável do Combo Tactics seguindo o [GDD](../pt-br/GDD.md), a [arquitet
 
 1. No Unity Hub: **Add > Add project from disk** e escolha esta pasta (`projeto/game`).
 2. O projeto está fixado em `6000.0.23f1`. Se a sua versão do Unity 6 for outra, o Hub pergunta qual usar: escolha a que estiver instalada e confirme.
-3. Na primeira abertura o script `ProjectSetup` cria a cena `Assets/_Project/Scenes/Boot.unity`, registra a cena no Build Settings e aplica as configurações de WebGL. Se isso não acontecer, use o menu **Combo Tactics > Configurar projeto**.
-4. Aperte **Play**. O jogo se monta sozinho em qualquer cena: o `GameRoot` usa `RuntimeInitializeOnLoadMethod`, então não há prefabs nem objetos para arrastar.
-5. Depois da primeira abertura, faça commit dos arquivos `.meta` e da cena `Boot.unity` que o Unity gerou.
+3. Abra a cena `Assets/_Project/Scenes/Boot.unity` e aperte **Play**. O jogo se monta sozinho em qualquer cena: o `GameRoot` usa `RuntimeInitializeOnLoadMethod`, então não há prefabs nem objetos para arrastar.
+
+O menu **Combo Tactics > Configurar projeto** refaz a configuração (cena Boot no Build Settings, opções de WebGL e importação dos sprites) se algo se perder.
 
 Para o build web: **File > Build Profiles > Web > Build**. O `ProjectSetup` já deixa Brotli com *Decompression Fallback* ligado (funciona no itch.io e no GitHub Pages).
 
@@ -24,13 +24,15 @@ Para o build web: **File > Build Profiles > Web > Build**. O `ProjectSetup` já 
 | IA | Regras de prioridade do Level Design com os 7 perfis do ADR-004 |
 | Modos | Campanha (4 fases), contra IA (Fácil, Normal, Difícil), PvP local com "passe o aparelho" e Modo Justo (R6) |
 | Meta | Moedas (100 / 50 / 500), loja de itens, evoluções de +3% até 5 níveis, save local em dois slots |
-| Arte | Fundos de arena e menu do projeto. Lutadores são formas coloridas por elemento e classe (placeholder). Sem áudio |
+| Arte | Fundos de arena e menu do projeto; sprites dos 9 lutadores e do Boss em `Resources/Art/Characters`. Sem áudio |
 
 ## Estrutura
 
 ```
 Assets/_Project/
   Resources/Art/          fundos de arena e do menu
+  Resources/Art/Characters/   um sprite por personagem, com o id dele no nome (fire_mage.png)
+  Scenes/Boot.unity       cena vazia de entrada
   Scripts/
     Core/                 regras de batalha em C# puro (sem UnityEngine)      ComboTactics.Core
     Game/                 conteúdo, perfil, loja, campanha, save (C# puro)    ComboTactics.Game
@@ -49,7 +51,7 @@ O fluxo de uma batalha: o `BattleDirector` pergunta aos controladores o que o mo
 
 O teste `PrintBalanceReport` roda milhares de batalhas IA contra IA e mostra a matriz 9×9 de duelos e a duração média das batalhas. Rode depois de mexer em atributos, habilidades ou perfis de IA.
 
-Situação da validação: `Core`, `Game` e os testes foram compilados em C# 9 e executados fora do Unity (102 de 102 passando). A camada `Presentation` foi compilada e exercitada contra uma simulação da API do Unity, percorrendo menu, loja, campanha, contra IA, PvP, desistência, diálogo de erro e save. **Ela ainda não rodou dentro do editor do Unity**; a primeira abertura do projeto é o teste que falta.
+Situação da validação: o projeto abre e roda no Unity `6000.0.23f1` (conferido pelo time em 11/11/2026). `Core`, `Game` e os testes também compilam e passam fora do Unity (102 de 102), e a camada `Presentation` é exercitada por um roteiro automático sobre uma simulação da API do Unity (menu, loja, campanha, contra IA, PvP, desistência, diálogo de erro e save). Ainda falta um build WebGL testado nos navegadores.
 
 ## Pontos de extensão
 
@@ -62,7 +64,7 @@ Situação da validação: `Core`, `Game` e os testes foram compilados em C# 9 e
 | Quem joga um lado (outra IA, rede) | `IBattleController` |
 | Como a batalha é desenhada (sprites, VFX, câmera) | `IBattleView`, implementada hoje por `BattleScreen` |
 | Áudio, câmera e analytics reagindo à batalha | evento `BattleDirector.EventPlayed` |
-| Arte dos lutadores e fundos | `Presentation/UI/Art.cs` |
+| Arte dos lutadores e fundos | `Presentation/UI/Art.cs`. Para trocar um sprite, substitua o PNG em `Resources/Art/Characters`; sem o arquivo, o jogo desenha uma forma colorida no lugar |
 | Timing do QTE | `QteConfig` em `Presentation/Battle/BattleWidgets.cs` |
 | Cores e textos de interface | `Presentation/UI/Theme.cs` |
 
@@ -96,8 +98,12 @@ Estes números são pontos de partida escolhidos para o MVP e validados pela sim
 
 ## Limitações conhecidas
 
-- A interface não foi executada no editor do Unity (ver Testes).
-- Sem áudio e sem arte de personagens.
+- **Faltam as regras novas do GDD de 20/10/2026:** afinidade e espectro (R11: o jogador começa só com os 3 lutadores de um elemento e libera os outros na campanha) e os cartões de história (R12). Os oponentes ainda se chamam "Treinador" e "Boss Final", não "Guardião". O Boss está sem classe; pela R9 nova ele é neutro só no elemento.
+- **Origem dos sprites:** os sprites dos lutadores foram recortados de imagens de referência reunidas pelo time, e parte delas é arte de terceiros (algumas com assinatura de artista). Servem como provisórios; antes de publicar o jogo, troquem por arte própria ou licenciada.
+- O Tanque de Água está com um sprite de tubarão; pelo GDD ele é uma baleia.
+- Alguns sprites olham para a esquerda; o da direita é sempre espelhado, então nem todos ficam de frente para o oponente.
+- Sem áudio.
+- Sem build WebGL testado ainda.
 - Evolução de 3% sobre um atributo baixo pode não mudar o valor: a Defesa 15 do Mago de Fogo continua 15 no nível 1.
 - A regra 3 da IA troca de lutador quando não tem Remédio, como está no Level Design, mas os efeitos acompanham o lutador no banco, então a troca não livra do DoT.
 - Fechar a aba no meio da batalha perde a batalha (o perfil só é gravado no fim, como previsto no System Design).
@@ -107,10 +113,11 @@ Estes números são pontos de partida escolhidos para o MVP e validados pela sim
 
 Técnicas:
 
-- Abrir no Unity 6, corrigir o que aparecer no Console e publicar um build WebGL de teste no itch.io.
+- Publicar um build WebGL de teste no itch.io e conferir no Chrome, Firefox e Safari.
+- Implementar afinidade e espectro (R11) e os cartões de história (R12).
 - Pipeline de CI (GameCI) rodando os testes EditMode e gerando o build a cada push.
 - Conteúdo em ScriptableObjects com validação no editor (ADR-003).
-- Áudio e VFX ligados ao `BattleDirector.EventPlayed`; sprites e animações no lugar das formas.
+- Áudio e VFX ligados ao `BattleDirector.EventPlayed`; arte própria e animações dos lutadores.
 - Painel de debug nos builds de desenvolvimento: adicionar moedas, forçar arena, forçar resultado do QTE.
 - Atributos fracionários (ou evolução mínima de +1) para toda evolução comprada ter efeito.
 - Localização: os textos estão em português dentro do código.
