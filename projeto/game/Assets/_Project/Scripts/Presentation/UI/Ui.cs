@@ -143,8 +143,7 @@ namespace ComboTactics.UI
             button.navigation = navigation;
 
             if (onClick != null) button.onClick.AddListener(() => Click(onClick));
-            if (!string.IsNullOrEmpty(label))
-                Label(image.transform, label, 6f, 0f, w - 12f, h, fontSize, Theme.Text, TextAnchor.MiddleCenter, FontStyle.Bold, true);
+            Label(image.transform, label, 6f, 0f, w - 12f, h, fontSize, Theme.Text, TextAnchor.MiddleCenter, FontStyle.Bold, !string.IsNullOrEmpty(label));
             return button;
         }
 

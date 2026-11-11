@@ -64,12 +64,10 @@ namespace ComboTactics.UI
             _arenaEffect = Ui.Label(top, "", 8, 26, 352, 20, 12, Theme.Text);
             _roundInfo = Ui.Label(top, "", 8, 46, 352, 20, 13, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold);
 
-            var speed = Ui.Button(top, "", 10, 68, 168, 28, ToggleSpeed, Theme.Button, 13);
+            var speed = Ui.Button(top, "Velocidade: " + Speed + "×", 10, 68, 168, 28, ToggleSpeed, Theme.Button, 13);
             _speedLabel = speed.GetComponentInChildren<Text>();
-            var quit = Ui.Button(top, "", 190, 68, 168, 28, Quit, Theme.Button, 13);
+            var quit = Ui.Button(top, "Desistir", 190, 68, 168, 28, Quit, Theme.Button, 13);
             _quitLabel = quit.GetComponentInChildren<Text>();
-            _speedLabel.text = "Velocidade: " + Speed + "×";
-            _quitLabel.text = "Desistir";
 
             var dock = Ui.Frame(Root, "CombatDock", 16, 566, 1248, 144, Theme.Panel, Theme.BorderGold, 2f);
             var msgStrip = Ui.Box(dock, "MessageStrip", 4, 4, 1236, 32, new Color(0.05f, 0.04f, 0.04f, 0.72f));
