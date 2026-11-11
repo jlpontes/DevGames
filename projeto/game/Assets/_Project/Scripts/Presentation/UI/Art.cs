@@ -5,13 +5,13 @@ using UnityEngine;
 namespace ComboTactics.UI
 {
     /// <summary>
-    /// Imagens do jogo. Os fundos vêm de Resources/Art; os lutadores ainda não têm arte, então são formas
-    /// geradas por código, coloridas por elemento e com um formato por classe (NEXT-STEPS, semana 1).
-    /// Para trocar por sprites finais, basta mudar o que estes métodos devolvem.
+    /// Imagens do jogo. Os fundos e os lutadores vêm de Resources/Art; se a imagem de um lutador não estiver no
+    /// projeto, uma forma gerada por código (colorida por elemento e com um formato por classe) entra no lugar.
     /// </summary>
     public static class Art
     {
         private static readonly Dictionary<string, Texture2D> Cache = new Dictionary<string, Texture2D>();
+        private static readonly HashSet<string> MissingSprites = new HashSet<string>();
 
         public static Texture2D Menu { get { return Load("Art/menu", new Color(0.10f, 0.09f, 0.14f)); } }
 
@@ -42,8 +42,37 @@ namespace ComboTactics.UI
             return texture;
         }
 
-        /// <summary>Guerreiro = losango, Mago = círculo, Tanque = octógono, Boss = círculo com anel.</summary>
-        public static Texture2D Fighter(Element element, CharClass charClass)
+        /// <summary>Verdadeiro quando existe um sprite do personagem em Resources/Art/Characters (arquivo com o id dele).</summary>
+        public static bool HasSprite(string characterId)
+        {
+            return LoadSprite(characterId) != null;
+        }
+
+        /// <summary>Sprite do personagem; sem arquivo para o id, entra a forma gerada por código.</summary>
+        public static Texture2D Fighter(string characterId, Element element, CharClass charClass)
+        {
+            Texture2D sprite = LoadSprite(characterId);
+            return sprite != null ? sprite : ProceduralFighter(element, charClass);
+        }
+
+        private static Texture2D LoadSprite(string characterId)
+        {
+            if (string.IsNullOrEmpty(characterId) || MissingSprites.Contains(characterId)) return null;
+            string path = "Art/Characters/" + characterId;
+            Texture2D texture;
+            if (Cache.TryGetValue(path, out texture) && texture != null) return texture;
+            texture = Resources.Load<Texture2D>(path);
+            if (texture == null)
+            {
+                MissingSprites.Add(characterId);
+                return null;
+            }
+            Cache[path] = texture;
+            return texture;
+        }
+
+        /// <summary>Fallback procedural: Guerreiro = losango, Mago = círculo, Tanque = octógono, Boss = círculo com anel.</summary>
+        private static Texture2D ProceduralFighter(Element element, CharClass charClass)
         {
             string key = "fighter/" + element + "/" + charClass;
             Texture2D texture;

@@ -101,8 +101,9 @@ namespace ComboTactics.UI
             bool selected = order >= 0;
             var card = Ui.Button(Root, "", x, y, 262, 160, () => Toggle(def.Id), selected ? new Color(0.30f, 0.36f, 0.20f, 1f) : Theme.PanelLight);
             var t = card.transform;
-            Ui.Picture(t, "Icon", Art.Fighter(def.Element, def.Class), 10, 10, 64, 64);
-            Ui.Label(t, Theme.ClassLetter(def.Class), 10, 10, 64, 64, 28, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold, true);
+            Ui.Picture(t, "Icon", Art.Fighter(def.Id, def.Element, def.Class), 10, 10, 64, 64);
+            if (!Art.HasSprite(def.Id))
+                Ui.Label(t, Theme.ClassLetter(def.Class), 10, 10, 64, 64, 28, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold, true);
             Ui.Label(t, def.Name, 82, 8, 174, 26, 18, Theme.Text, TextAnchor.MiddleLeft, FontStyle.Bold);
             Ui.Label(t, Theme.ElementName(def.Element) + " · " + Theme.ClassName(def.Class), 82, 32, 174, 20, 14, Theme.ElementColor(def.Element), TextAnchor.MiddleLeft);
             Ui.Label(t, def.Appearance, 82, 52, 174, 20, 13, Theme.Muted, TextAnchor.MiddleLeft, FontStyle.Italic);

@@ -56,8 +56,9 @@ namespace ComboTactics.UI
             }
 
             var chosen = content.Character(_selectedId);
-            Ui.Picture(upgrades.transform, "Icon", Art.Fighter(chosen.Element, chosen.Class), 20, 222, 72, 72);
-            Ui.Label(upgrades.transform, Theme.ClassLetter(chosen.Class), 20, 222, 72, 72, 30, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold, true);
+            Ui.Picture(upgrades.transform, "Icon", Art.Fighter(chosen.Id, chosen.Element, chosen.Class), 20, 222, 72, 72);
+            if (!Art.HasSprite(chosen.Id))
+                Ui.Label(upgrades.transform, Theme.ClassLetter(chosen.Class), 20, 222, 72, 72, 30, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold, true);
             Ui.Label(upgrades.transform, chosen.Name, 104, 224, 580, 34, 26, Theme.Text, TextAnchor.MiddleLeft, FontStyle.Bold);
             Ui.Label(upgrades.transform, Theme.ElementName(chosen.Element) + " · " + Theme.ClassName(chosen.Class) + " · " + chosen.Appearance,
                 104, 258, 580, 26, 16, Theme.Muted, TextAnchor.MiddleLeft);

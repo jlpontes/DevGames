@@ -63,6 +63,8 @@ namespace ComboTactics.UI
             Ui.PlaceCentered(_body, centerX, centerY, BodySize, BodySize);
             _home = _body.anchoredPosition;
             _sprite = Ui.Picture(_body, "Sprite", null, 0, 0, BodySize, BodySize);
+            // O lutador da direita é espelhado para os dois ficarem de frente um para o outro.
+            if (centerX > Theme.Width * 0.5f) _sprite.uvRect = new Rect(1f, 0f, -1f, 1f);
             _letter = Ui.Label(_body, "", 0, 0, BodySize, BodySize, 64, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold, true);
         }
 
@@ -70,8 +72,8 @@ namespace ComboTactics.UI
         {
             var spec = fighter.Spec;
             _maxHp = spec.MaxHp;
-            _sprite.texture = Art.Fighter(spec.Element, spec.Class);
-            _letter.text = Theme.ClassLetter(spec.Class);
+            _sprite.texture = Art.Fighter(spec.Id, spec.Element, spec.Class);
+            _letter.text = Art.HasSprite(spec.Id) ? "" : Theme.ClassLetter(spec.Class);
             _name.text = spec.Name;
             _sub.text = Theme.ElementName(spec.Element) + " · " + Theme.ClassName(spec.Class) + " · ATQ " + spec.Attack + " DEF " + spec.Defense + " VEL " + spec.Speed;
             _effects.text = BattleText.Effects(fighter.Effects, catalog);

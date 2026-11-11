@@ -24,7 +24,9 @@ namespace ComboTactics.EditorTools
 
         private static void RunOnceIfNeeded()
         {
-            if (File.Exists(ScenePath) || EditorApplication.isPlayingOrWillChangePlaymode) return;
+            if (EditorApplication.isPlayingOrWillChangePlaymode) return;
+            ConfigureCharacterTextures();
+            if (File.Exists(ScenePath)) return;
 
             // Criar a cena Boot troca a cena aberta; só faz isso sozinho se não houver trabalho não salvo.
             var open = SceneManager.GetActiveScene();
@@ -57,8 +59,28 @@ namespace ComboTactics.EditorTools
             PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Brotli;
             PlayerSettings.WebGL.decompressionFallback = true;
 
+            ConfigureCharacterTextures();
+
             AssetDatabase.SaveAssets();
             Debug.Log("Combo Tactics: projeto configurado. Abra " + ScenePath + " (ou qualquer cena) e aperte Play.");
+        }
+
+        private static void ConfigureCharacterTextures()
+        {
+            const string folder = "Assets/_Project/Resources/Art/Characters";
+            if (!AssetDatabase.IsValidFolder(folder)) return;
+            foreach (string guid in AssetDatabase.FindAssets("t:Texture2D", new[] { folder }))
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                var importer = AssetImporter.GetAtPath(path) as TextureImporter;
+                if (importer == null) continue;
+                if (!importer.alphaIsTransparency || importer.wrapMode != TextureWrapMode.Clamp)
+                {
+                    importer.alphaIsTransparency = true;
+                    importer.wrapMode = TextureWrapMode.Clamp;
+                    importer.SaveAndReimport();
+                }
+            }
         }
 
         [MenuItem("Combo Tactics/Apagar save local")]
