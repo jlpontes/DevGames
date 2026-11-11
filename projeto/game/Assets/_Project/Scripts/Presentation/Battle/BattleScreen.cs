@@ -276,7 +276,8 @@ namespace ComboTactics.UI
         private IEnumerator ReactionWindow(int side, float sweepSeconds, Action<ReactionResult> reply)
         {
             // A janela ocupa a faixa do menu de ações, que fica vazia enquanto os golpes se resolvem.
-            const float barX = 320f, barY = 650f, barWidth = 640f, barHeight = 40f;
+            const float barWidth = 420f, barHeight = 26f;
+            const float barX = (Theme.Width - barWidth) * 0.5f, barY = 648f;
             float target = UnityEngine.Random.Range(QteConfig.TargetMin, QteConfig.TargetMax);
             float goodWidth = Mathf.Min(1f, 2f * QteConfig.GoodSeconds / sweepSeconds) * barWidth;
             float perfectWidth = Mathf.Min(1f, 2f * QteConfig.PerfectSeconds / sweepSeconds) * barWidth;
@@ -285,12 +286,13 @@ namespace ComboTactics.UI
             bool clicked = false;
             var catcher = Ui.Button(root, "", 0, 0, Theme.Width, Theme.Height, () => clicked = true, new Color(0f, 0f, 0f, 0.20f));
             catcher.transition = Selectable.Transition.None;
-            var title = Ui.Label(root, _match.SideNames[side] + ": DEFENDA!", 0, 602, Theme.Width, 42, 32, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold, true);
-            Ui.Label(root, "Clique (ou Espaço) quando o marcador passar pelo alvo · azul = desvio · amarelo = contra-ataque", 0, 694, Theme.Width, 24, 15, Theme.Text, TextAnchor.MiddleCenter, FontStyle.Normal, true);
-            var bar = Ui.Box(root, "Bar", barX, barY, barWidth, barHeight, new Color(0f, 0f, 0f, 0.8f));
-            Ui.Box(bar.transform, "Good", target * barWidth - goodWidth * 0.5f, 4, goodWidth, barHeight - 8, new Color(0.25f, 0.65f, 0.95f, 0.9f));
-            Ui.Box(bar.transform, "Perfect", target * barWidth - perfectWidth * 0.5f, 4, perfectWidth, barHeight - 8, Theme.Gold);
-            var marker = Ui.Box(bar.transform, "Marker", 0, -8, 8, barHeight + 16, Color.white);
+            var title = Ui.Label(root, _match.SideNames[side] + ": DEFENDA!", 0, 604, Theme.Width, 38, 28, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold, true);
+            Ui.Label(root, "Clique (ou Espaço) no alvo · azul = desvio · amarelo = contra-ataque", 0, 682, Theme.Width, 24, 14, Theme.Text, TextAnchor.MiddleCenter, FontStyle.Normal, true);
+            var barFrame = Ui.Box(root, "BarFrame", barX - 3f, barY - 3f, barWidth + 6f, barHeight + 6f, new Color(0.75f, 0.58f, 0.24f, 0.9f));
+            var bar = Ui.Box(barFrame.transform, "Bar", 3f, 3f, barWidth, barHeight, new Color(0.05f, 0.06f, 0.09f, 0.95f));
+            Ui.Box(bar.transform, "Good", target * barWidth - goodWidth * 0.5f, 3, goodWidth, barHeight - 6, new Color(0.22f, 0.62f, 0.95f, 0.92f));
+            Ui.Box(bar.transform, "Perfect", target * barWidth - perfectWidth * 0.5f, 3, perfectWidth, barHeight - 6, Theme.Gold);
+            var marker = Ui.Box(bar.transform, "Marker", 0, -6, 6, barHeight + 12, Color.white);
 
             // Preparação: o marcador fica parado por um tempo sorteado. Clicar cedo demais conta como erro.
             float telegraph = UnityEngine.Random.Range(QteConfig.TelegraphMin, QteConfig.TelegraphMax);

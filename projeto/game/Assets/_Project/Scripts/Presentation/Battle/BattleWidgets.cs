@@ -9,10 +9,10 @@ namespace ComboTactics.UI
     /// <summary>Números do QTE (SYSTEM-DESIGN §3.2). O núcleo só recebe o resultado; o timing é medido aqui.</summary>
     public static class QteConfig
     {
-        /// <summary>Clique a até 60 ms do alvo: contra-ataque.</summary>
-        public static float PerfectSeconds = 0.06f;
-        /// <summary>Clique a até 150 ms do alvo: desvio.</summary>
-        public static float GoodSeconds = 0.15f;
+        /// <summary>Clique a até 30 ms do alvo: contra-ataque.</summary>
+        public static float PerfectSeconds = 0.03f;
+        /// <summary>Clique a até 80 ms do alvo: desvio.</summary>
+        public static float GoodSeconds = 0.08f;
         /// <summary>Posição do alvo na barra, sorteada a cada golpe.</summary>
         public static float TargetMin = 0.55f;
         public static float TargetMax = 0.85f;
