@@ -31,7 +31,10 @@ namespace ComboTactics.UI
             int teamSize = services.Rules.MaxTeamSize;
             bool useUpgrades = !IsPvp || !services.Profile.FairPvp;
 
-            Ui.Backdrop(Root);
+            Texture backdropArt = _request.Mode == GameMode.Campaign
+                ? Art.Arena(services.Campaign.Stages[_request.StageIndex].HomeArena)
+                : null;
+            Ui.Backdrop(Root, backdropArt, 0.30f);
             string title = IsPvp ? "Equipe " + (_player + 1) + " — Jogador " + (_player + 1) : "Seleção de Personagens";
             Ui.Label(Root, title, 30, 12, 800, 44, 34, Theme.Gold, TextAnchor.MiddleLeft, FontStyle.Bold, true);
             Ui.Label(Root, "Escolha " + teamSize + " lutadores para a arena. O 1º escolhido inicia o combate.", 30, 54, 800, 24, 16, Theme.Muted, TextAnchor.MiddleLeft);

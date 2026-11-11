@@ -72,14 +72,23 @@ namespace ComboTactics.UI
             return inner.rectTransform;
         }
 
-        /// <summary>Fundo atmosférico usando a arte do torneio escurecida, evitando telas chapadas.</summary>
-        public static void Backdrop(Transform parent, Texture customArt = null, float brightness = 0.24f)
+        /// <summary>Fundo atmosférico usando a arte do torneio ou de uma arena com movimento suave e fagulhas de ambiente.</summary>
+        public static void Backdrop(Transform parent, Texture customArt = null, float brightness = 0.26f)
         {
             Box(parent, "Base", 0, 0, Theme.Width, Theme.Height, new Color(0.05f, 0.04f, 0.07f, 1f));
-            var pic = Picture(parent, "BackdropArt", customArt != null ? customArt : Art.Menu, -20, 0, 1320, 720);
+            var pic = Picture(parent, "BackdropArt", customArt != null ? customArt : Art.Menu, -24, -14, 1328, 748);
             pic.color = new Color(brightness, brightness * 0.95f, brightness * 1.05f, 1f);
+            AddAmbientSparks(parent, pic.rectTransform, new Color(1f, 0.78f, 0.36f, 0.45f), 14);
             Box(parent, "TopVignette", 0, 0, Theme.Width, 84, new Color(0.04f, 0.03f, 0.06f, 0.72f));
             Box(parent, "BottomBar", 0, 78, Theme.Width, 2, Theme.BorderSubtle);
+        }
+
+        /// <summary>Adiciona partículas flutuantes e leve respiração de câmera a um fundo de menu.</summary>
+        public static void AddAmbientSparks(Transform parent, RectTransform driftingArt, Color sparkColor, int count = 16)
+        {
+            var container = Node(parent, "AmbientSparks", 0, 0, Theme.Width, Theme.Height);
+            var anim = container.gameObject.AddComponent<AmbientBackdropAnimator>();
+            anim.Initialize(driftingArt, sparkColor, count);
         }
 
         public static RawImage Picture(Transform parent, string name, Texture texture, float x, float y, float w, float h)
@@ -205,5 +214,59 @@ namespace ComboTactics.UI
         }
 
         public void SetColor(Color color) { _fillImage.color = color; }
+    }
+
+    /// <summary>Animação contínua de partículas e leve deriva de câmera para os fundos de menu.</summary>
+    public sealed class AmbientBackdropAnimator : MonoBehaviour
+    {
+        private RectTransform _driftingArt;
+        private Vector2 _artHome;
+        private RawImage[] _motes;
+        private float[] _seed;
+        private Color _baseColor;
+
+        public void Initialize(RectTransform driftingArt, Color color, int count)
+        {
+            _driftingArt = driftingArt;
+            if (_driftingArt != null) _artHome = _driftingArt.anchoredPosition;
+            _baseColor = color;
+            _motes = new RawImage[count];
+            _seed = new float[count];
+            for (int i = 0; i < count; i++)
+            {
+                _seed[i] = (i * 1.37f) % 10f;
+                float size = 10f + (i % 4) * 6f;
+                var img = Ui.Picture(transform, "Mote" + i, Art.VfxOrb, 0, 0, size, size);
+                img.color = color;
+                _motes[i] = img;
+            }
+        }
+
+        private void Update()
+        {
+            float time = Time.unscaledTime;
+            if (_driftingArt != null)
+            {
+                float dx = Mathf.Sin(time * 0.35f) * 10f;
+                float dy = Mathf.Cos(time * 0.25f) * 6f;
+                _driftingArt.anchoredPosition = _artHome + new Vector2(dx, dy);
+            }
+
+            if (_motes == null) return;
+            for (int i = 0; i < _motes.Length; i++)
+            {
+                var mote = _motes[i];
+                if (mote == null) continue;
+                float s = _seed[i];
+                float cycle = Mathf.Repeat(time * (0.045f + (i % 3) * 0.015f) + s * 0.1f, 1f);
+                float x = Mathf.Repeat(s * 137f + Mathf.Sin(time * 0.6f + s) * 45f, Theme.Width);
+                float y = Mathf.Lerp(Theme.Height + 20f, -20f, cycle);
+                float size = 10f + (i % 4) * 6f;
+                Ui.PlaceCentered(mote.rectTransform, x, y, size, size);
+                var c = _baseColor;
+                c.a = _baseColor.a * Mathf.Sin(cycle * Mathf.PI) * (0.65f + 0.35f * Mathf.Sin(time * 2.4f + s));
+                mote.color = c;
+            }
+        }
     }
 }

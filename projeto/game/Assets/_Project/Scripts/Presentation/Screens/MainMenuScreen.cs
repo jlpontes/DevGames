@@ -10,8 +10,9 @@ namespace ComboTactics.UI
 
         protected override void Build()
         {
-            // A arte do menu é 1024×559; cobre o palco inteiro com uma sobra pequena dos lados.
-            Ui.Picture(Root, "Background", Art.Menu, -20, 0, 1320, 720);
+            // A arte do menu é 1024×559; cobre o palco inteiro com leve movimento de câmera e fagulhas do torneio.
+            var bg = Ui.Picture(Root, "Background", Art.Menu, -24, -14, 1328, 748);
+            Ui.AddAmbientSparks(Root, bg.rectTransform, new Color(1f, 0.74f, 0.30f, 0.52f), 18);
 
             // Moldura inferior integrada ao escudo do torneio, sem cobrir o emblema central.
             var dock = Ui.Frame(Root, "MenuDock", 100, 566, 1080, 104, new Color(0.06f, 0.05f, 0.08f, 0.86f), Theme.BorderGold, 2f);

@@ -36,6 +36,17 @@ namespace ComboTactics.UI
             }
         }
 
+        public static Color ArenaColor(ArenaId arena)
+        {
+            switch (arena)
+            {
+                case ArenaId.Volcano: return new Color(0.95f, 0.40f, 0.14f, 1f);
+                case ArenaId.Sea: return new Color(0.20f, 0.66f, 0.96f, 1f);
+                case ArenaId.Forest: return new Color(0.30f, 0.78f, 0.38f, 1f);
+                default: return new Color(0.68f, 0.52f, 0.96f, 1f);
+            }
+        }
+
         public static Color HpColor(float fraction)
         {
             if (fraction > 0.5f) return Good;
