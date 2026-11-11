@@ -46,11 +46,13 @@ namespace ComboTactics.UI
         private int _maxHp = 1;
 
         public float CenterX { get; private set; }
+        public float CenterY { get; private set; }
         public float ShownHp { get; private set; }
 
         public FighterWidget(Transform parent, float centerX, float centerY)
         {
             CenterX = centerX;
+            CenterY = centerY;
             float left = centerX - PlateWidth * 0.5f;
             var plate = Ui.Box(parent, "Plate", left, centerY - 196f, PlateWidth, 94f, Theme.Panel);
             _name = Ui.Label(plate.transform, "", 8, 2, PlateWidth - 16, 26, 19, Theme.Text, TextAnchor.MiddleCenter, FontStyle.Bold);
@@ -94,6 +96,7 @@ namespace ComboTactics.UI
 
         public void SetOffset(Vector2 offset) { _body.anchoredPosition = _home + offset; }
         public void SetScale(float scale) { _body.localScale = new Vector3(scale, scale, 1f); }
+        public void SetRotation(float degrees) { _body.localRotation = Quaternion.Euler(0f, 0f, degrees); }
         public void SetTint(Color color) { color.a = _sprite.color.a; _sprite.color = color; }
 
         public void SetAlpha(float alpha)
@@ -110,6 +113,7 @@ namespace ComboTactics.UI
         {
             SetOffset(Vector2.zero);
             SetScale(1f);
+            SetRotation(0f);
             SetTint(Color.white);
         }
     }

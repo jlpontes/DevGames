@@ -115,5 +115,128 @@ namespace ComboTactics.UI
             Cache[key] = texture;
             return texture;
         }
+
+        // ── Texturas procedurais de efeitos visuais (VFX) ────────────────────────
+
+        /// <summary>Esfera suave com brilho central (projéteis, bolas de fogo, esporos, partículas).</summary>
+        public static Texture2D VfxOrb
+        {
+            get
+            {
+                return BuildVfx("vfx/orb", 96, (nx, ny) =>
+                {
+                    float r = Mathf.Sqrt(nx * nx + ny * ny);
+                    return Mathf.Pow(Mathf.Clamp01(1f - r), 1.6f);
+                });
+            }
+        }
+
+        /// <summary>Anel luminoso (ondas de choque, escudos, pulsos gravitacionais).</summary>
+        public static Texture2D VfxRing
+        {
+            get
+            {
+                return BuildVfx("vfx/ring", 128, (nx, ny) =>
+                {
+                    float r = Mathf.Sqrt(nx * nx + ny * ny);
+                    float ring = 1f - Mathf.Abs(r - 0.72f) / 0.18f;
+                    float fill = Mathf.Clamp01(0.85f - r) * 0.25f;
+                    return Mathf.Clamp01(Mathf.Max(ring, fill));
+                });
+            }
+        }
+
+        /// <summary>Arco diagonal de corte (espada, lança, tridente, machado, garras).</summary>
+        public static Texture2D VfxSlash
+        {
+            get
+            {
+                return BuildVfx("vfx/slash", 128, (nx, ny) =>
+                {
+                    // Rotaciona 45 graus para formar um crescente diagonal.
+                    float u = (nx + ny) * 0.7071f;
+                    float v = (ny - nx) * 0.7071f;
+                    float curve = v + 0.28f * u * u - 0.08f;
+                    float thickness = 0.16f * (1f - 0.75f * u * u);
+                    if (thickness <= 0.01f) return 0f;
+                    float alpha = 1f - Mathf.Abs(curve) / thickness;
+                    float ends = Mathf.Clamp01((0.92f - Mathf.Abs(u)) * 3.5f);
+                    return Mathf.Clamp01(alpha) * ends;
+                });
+            }
+        }
+
+        /// <summary>Coluna/pilar vertical com base larga (gêiser, erupção vulcânica, raízes, pilar lunar).</summary>
+        public static Texture2D VfxPillar
+        {
+            get
+            {
+                return BuildVfx("vfx/pillar", 128, (nx, ny) =>
+                {
+                    float y01 = (ny + 1f) * 0.5f;
+                    float width = Mathf.Lerp(0.68f, 0.32f, y01);
+                    float horiz = 1f - Mathf.Abs(nx) / width;
+                    float vert = Mathf.Sin(y01 * Mathf.PI);
+                    return Mathf.Clamp01(horiz * 1.4f) * Mathf.Pow(Mathf.Clamp01(vert), 0.6f);
+                });
+            }
+        }
+
+        /// <summary>Cúpula/escudo protetor para habilidades defensivas e barreiras.</summary>
+        public static Texture2D VfxShield
+        {
+            get
+            {
+                return BuildVfx("vfx/shield", 128, (nx, ny) =>
+                {
+                    float r = Mathf.Sqrt(nx * nx * 1.15f + ny * ny * 0.9f);
+                    if (r > 0.95f) return 0f;
+                    float rim = Mathf.Clamp01(1f - Mathf.Abs(r - 0.82f) / 0.14f);
+                    float dome = Mathf.Clamp01((0.85f - r) * 0.45f) * Mathf.Clamp01((ny + 0.6f) * 0.9f);
+                    return Mathf.Clamp01(rim + dome);
+                });
+            }
+        }
+
+        /// <summary>Lâmina/folha/estilhaço pontiagudo (folhas cortantes, estilhaços de gelo, espinhos).</summary>
+        public static Texture2D VfxShard
+        {
+            get
+            {
+                return BuildVfx("vfx/shard", 64, (nx, ny) =>
+                {
+                    float d = Mathf.Abs(ny) / Mathf.Max(0.05f, 0.38f * (1f - nx * nx));
+                    float len = Mathf.Clamp01((0.95f - Mathf.Abs(nx)) * 3f);
+                    return Mathf.Clamp01(1f - d) * len;
+                });
+            }
+        }
+
+        private static Texture2D BuildVfx(string key, int size, System.Func<float, float, float> shape)
+        {
+            Texture2D texture;
+            if (Cache.TryGetValue(key, out texture) && texture != null) return texture;
+
+            var pixels = new Color[size * size];
+            for (int y = 0; y < size; y++)
+            {
+                float ny = (y + 0.5f) / (size * 0.5f) - 1f;
+                for (int x = 0; x < size; x++)
+                {
+                    float nx = (x + 0.5f) / (size * 0.5f) - 1f;
+                    float a = Mathf.Clamp01(shape(nx, ny));
+                    float core = Mathf.Clamp01((a - 0.55f) * 2.2f);
+                    pixels[y * size + x] = new Color(Mathf.Lerp(1f, 1f, core), Mathf.Lerp(0.92f, 1f, core), Mathf.Lerp(0.82f, 1f, core), a);
+                }
+            }
+
+            texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            texture.wrapMode = TextureWrapMode.Clamp;
+            texture.filterMode = FilterMode.Bilinear;
+            texture.SetPixels(pixels);
+            texture.Apply();
+            Cache[key] = texture;
+            return texture;
+        }
     }
 }
