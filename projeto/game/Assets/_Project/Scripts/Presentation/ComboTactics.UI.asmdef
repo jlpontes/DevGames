@@ -1,0 +1,18 @@
+{
+    "name": "ComboTactics.UI",
+    "rootNamespace": "ComboTactics.UI",
+    "references": [
+        "ComboTactics.Core",
+        "ComboTactics.Game",
+        "UnityEngine.UI"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

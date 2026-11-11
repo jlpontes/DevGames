@@ -1,0 +1,16 @@
+{
+    "name": "ComboTactics.Game",
+    "rootNamespace": "ComboTactics.Game",
+    "references": [
+        "ComboTactics.Core"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": true
+}

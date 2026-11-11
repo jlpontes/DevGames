@@ -1,0 +1,123 @@
+# Combo Tactics — projeto Unity (MVP)
+
+Versão jogável do Combo Tactics seguindo o [GDD](../pt-br/GDD.md), a [arquitetura](../pt-br/architecture/ARCHITECTURE.md) e os ADRs. Unity 6, C# 9, interface em uGUI montada por código, sem backend.
+
+## Como abrir e jogar
+
+1. No Unity Hub: **Add > Add project from disk** e escolha esta pasta (`projeto/game`).
+2. O projeto está fixado em `6000.0.23f1`. Se a sua versão do Unity 6 for outra, o Hub pergunta qual usar: escolha a que estiver instalada e confirme.
+3. Na primeira abertura o script `ProjectSetup` cria a cena `Assets/_Project/Scenes/Boot.unity`, registra a cena no Build Settings e aplica as configurações de WebGL. Se isso não acontecer, use o menu **Combo Tactics > Configurar projeto**.
+4. Aperte **Play**. O jogo se monta sozinho em qualquer cena: o `GameRoot` usa `RuntimeInitializeOnLoadMethod`, então não há prefabs nem objetos para arrastar.
+5. Depois da primeira abertura, faça commit dos arquivos `.meta` e da cena `Boot.unity` que o Unity gerou.
+
+Para o build web: **File > Build Profiles > Web > Build**. O `ProjectSetup` já deixa Brotli com *Decompression Fallback* ligado (funciona no itch.io e no GitHub Pages).
+
+## O que está implementado
+
+| Área | Situação |
+|---|---|
+| Batalha | Atacar, usar item, trocar; ordem por Velocidade com troca primeiro; dano com Defesa, vantagens de elemento e classe (R1) e arena |
+| Stamina e especial | Barra por jogador, +20 / +15 / +25, zera ao usar o especial (R7) |
+| Janela de resposta (QTE) | Marcador cruza a barra; perfeito (±60 ms) = contra-ataque, bom (±150 ms) = desvio (R3). Clique ou Espaço |
+| Efeitos | Chamas, Afogamento, Veneno, Regeneração, Ataque +10%, Defesa +10%; 3 turnos; continuam no banco |
+| Arena | Começa na arena do oponente (campanha) ou sorteada; roleta a cada 3 rodadas (R4, R5) |
+| IA | Regras de prioridade do Level Design com os 7 perfis do ADR-004 |
+| Modos | Campanha (4 fases), contra IA (Fácil, Normal, Difícil), PvP local com "passe o aparelho" e Modo Justo (R6) |
+| Meta | Moedas (100 / 50 / 500), loja de itens, evoluções de +3% até 5 níveis, save local em dois slots |
+| Arte | Fundos de arena e menu do projeto. Lutadores são formas coloridas por elemento e classe (placeholder). Sem áudio |
+
+## Estrutura
+
+```
+Assets/_Project/
+  Resources/Art/          fundos de arena e do menu
+  Scripts/
+    Core/                 regras de batalha em C# puro (sem UnityEngine)      ComboTactics.Core
+    Game/                 conteúdo, perfil, loja, campanha, save (C# puro)    ComboTactics.Game
+    Presentation/         telas, batalha, entrada do jogador (Unity)          ComboTactics.UI
+    Editor/               configuração automática do projeto
+    Tests/                testes EditMode e simulação de balanceamento
+```
+
+As dependências apontam só para baixo: `Presentation → Game → Core`. `Core` e `Game` têm `noEngineReferences: true`, então um `using UnityEngine;` ali não compila.
+
+O fluxo de uma batalha: o `BattleDirector` pergunta aos controladores o que o motor espera (`Pending`), envia a resposta ao `BattleEngine` e toca os `BattleEvent`s devolvidos, um por vez, na `BattleScreen`. A tela desenha a partir de um `BattleSnapshot` atualizado evento a evento e nunca lê as regras.
+
+## Testes
+
+**Window > General > Test Runner > EditMode > Run All.** São 102 testes: fórmula de dano com os exemplos do GDD (135 e 29), regras R1–R10, cada regra da IA, loja, campanha, save e a simulação de balanceamento.
+
+O teste `PrintBalanceReport` roda milhares de batalhas IA contra IA e mostra a matriz 9×9 de duelos e a duração média das batalhas. Rode depois de mexer em atributos, habilidades ou perfis de IA.
+
+Situação da validação: `Core`, `Game` e os testes foram compilados em C# 9 e executados fora do Unity (102 de 102 passando). A camada `Presentation` foi compilada e exercitada contra uma simulação da API do Unity, percorrendo menu, loja, campanha, contra IA, PvP, desistência, diálogo de erro e save. **Ela ainda não rodou dentro do editor do Unity**; a primeira abertura do projeto é o teste que falta.
+
+## Pontos de extensão
+
+| Para mudar | Onde |
+|---|---|
+| Números de regra (multiplicadores, stamina, intervalo da arena) | `Core/Model/BattleRules.cs` |
+| Personagens, habilidades, itens, oponentes, perfis de IA | `Game/Content/BuiltInContent.cs`. Outra fonte (ScriptableObjects, JSON) só precisa devolver um `ContentDatabase` |
+| Preços e recompensas | `EconomyConfig` em `Game/Content/Defs.cs` |
+| Onde o save é gravado | `ISaveStore` (hoje `TwoSlotSaveStore` sobre `PlayerPrefs`); a troca é feita em `GameRoot.Awake` |
+| Quem joga um lado (outra IA, rede) | `IBattleController` |
+| Como a batalha é desenhada (sprites, VFX, câmera) | `IBattleView`, implementada hoje por `BattleScreen` |
+| Áudio, câmera e analytics reagindo à batalha | evento `BattleDirector.EventPlayed` |
+| Arte dos lutadores e fundos | `Presentation/UI/Art.cs` |
+| Timing do QTE | `QteConfig` em `Presentation/Battle/BattleWidgets.cs` |
+| Cores e textos de interface | `Presentation/UI/Theme.cs` |
+
+Erros: regras violadas pelo jogador lançam `GameException` e viram um aviso na tela. Qualquer outra exceção cai no `ErrorReporter`, que abre um diálogo com a seed e o log de comandos da batalha (reproduzem a partida).
+
+## Valores que os documentos deixavam em aberto
+
+Estes números são pontos de partida escolhidos para o MVP e validados pela simulação. Revisem com o time.
+
+| Tema | Valor adotado |
+|---|---|
+| Habilidades | Cada personagem: golpe de poder 100; golpe de poder 80–85 com efeito; especial de poder 200 com efeito garantido |
+| Efeitos nas habilidades | Guerreiros e Tanques: bônus próprio de Ataque ou Defesa no segundo golpe. Magos: 50% de chance de DoT no segundo golpe. Especiais aplicam o DoT do elemento; o do Guerreiro de Planta aplica Regeneração |
+| DoT | 20% do Ataque de quem aplicou, por turno; ignora Defesa e vantagens |
+| Regeneração | 4% do HP máximo por turno |
+| Boss "Titã Lunar" | HP 2600, Ataque 105, Defesa 50, Velocidade 45, sem elemento nem classe |
+| Preços | Kit Médico 60, Remédio 40, Poções 50; evolução custa 50 × (nível + 1) |
+| Itens dos oponentes | Fogo: 1 Kit; Água: 1 Kit e 1 Remédio; Planta: 2 Kits e 1 Remédio; Boss: 1 Remédio |
+| Contra IA | A IA sorteia 3 personagens com atributos base e leva 1 Kit e 1 Remédio |
+| PvP local | Não rende moedas. Com o Modo Justo desligado, os dois lados usam as evoluções do perfil |
+| Stamina no contra-ataque | Quem contra-ataca ganha os +25 da reação, sem somar +20 pelo dano |
+| Efeito em golpe desviado | Não é aplicado, nem o bônus próprio |
+| Empate | Se os dois últimos lutadores caem no mesmo fim de turno, a batalha empata e paga como derrota |
+
+## O que a simulação mostra
+
+- **Equilíbrio dos 9 personagens:** com QTE de 50% para os dois lados, cada personagem vence entre 48% e 53% dos seus duelos. Nos 9 confrontos em que as vantagens se anulam (ex.: Guerreiro de Fogo contra Mago de Água), ninguém passa de 60%.
+- **Duração das batalhas 3v3** (média de rodadas): 28 sem QTE, 33 no Fácil, 45 no Normal, 62 no Difícil. O alerta do NEXT-STEPS é 40. O que alonga a partida é a chance de desvio, não o duelo de Tanques.
+- **O QTE decide quase tudo:** a IA Difícil (80% de acerto) vence a Fácil (20%) em quase todas as batalhas simuladas.
+- **Campanha** (IA Normal no lugar do jogador, equipe sorteada, sem evoluções): Fogo 89%, Água 58%, Planta 9%, Boss 20%. Com a equipe do elemento certo e evoluções, a Planta e o Boss ficam ao alcance.
+
+## Limitações conhecidas
+
+- A interface não foi executada no editor do Unity (ver Testes).
+- Sem áudio e sem arte de personagens.
+- Evolução de 3% sobre um atributo baixo pode não mudar o valor: a Defesa 15 do Mago de Fogo continua 15 no nível 1.
+- A regra 3 da IA troca de lutador quando não tem Remédio, como está no Level Design, mas os efeitos acompanham o lutador no banco, então a troca não livra do DoT.
+- Fechar a aba no meio da batalha perde a batalha (o perfil só é gravado no fim, como previsto no System Design).
+- O conteúdo está em C#, não em ScriptableObjects (ADR-003): assim a simulação roda fora do Unity. Migrar é preencher o mesmo `ContentDatabase` a partir de assets.
+
+## Fase 2 (sugestões)
+
+Técnicas:
+
+- Abrir no Unity 6, corrigir o que aparecer no Console e publicar um build WebGL de teste no itch.io.
+- Pipeline de CI (GameCI) rodando os testes EditMode e gerando o build a cada push.
+- Conteúdo em ScriptableObjects com validação no editor (ADR-003).
+- Áudio e VFX ligados ao `BattleDirector.EventPlayed`; sprites e animações no lugar das formas.
+- Painel de debug nos builds de desenvolvimento: adicionar moedas, forçar arena, forçar resultado do QTE.
+- Atributos fracionários (ou evolução mínima de +1) para toda evolução comprada ter efeito.
+- Localização: os textos estão em português dentro do código.
+
+De jogo e negócio:
+
+- Rever o peso do QTE: reduzir as chances da IA, limitar o desvio a parte do dano, ou encurtar as janelas. É o maior fator de duração e de dificuldade.
+- Level design das fases de Fogo, Planta e Boss, e atributos finais do Boss.
+- Playtest com pessoas de fora do time para calibrar os tempos do QTE e os preços da loja.
+- Depois do MVP: sistema de apostas, PvP online e save na nuvem (pedem backend; o motor determinístico com seed já permite validar batalhas no servidor).

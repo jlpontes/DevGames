@@ -1,0 +1,36 @@
+# Unity: pastas geradas pelo editor
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]emoryCaptures/
+/[Rr]ecordings/
+
+# Projetos gerados para a IDE
+/*.csproj
+/*.sln
+/*.slnx
+/*.suo
+/*.user
+/*.userprefs
+/*.pidb
+/*.booproj
+/.vs/
+/.vscode/
+/.idea/
+/.gradle/
+
+# Builds e relatórios
+*.apk
+*.aab
+*.unitypackage
+*.pdb.meta
+*.mdb.meta
+crashlytics-build.properties
+sysinfo.txt
+
+# macOS
+.DS_Store

@@ -1,2 +1,12 @@
 # Claude Code skill guides: used by AI agents, not part of the project
 projeto/*/skill/
+
+# macOS
+.DS_Store
+
+# Arquivos locais do Claude
+Claude outputs/
+.claude/
+
+# Clone do repositório do Enrique (repo separado)
+/DevGames/
