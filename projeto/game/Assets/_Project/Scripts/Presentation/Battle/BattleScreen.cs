@@ -30,6 +30,7 @@ namespace ComboTactics.UI
         private ArenaStage _stage;
         private Image _topBorder;
         private Image _dockBorder;
+        private SkillSpec _incomingSkill;
         private Text _arenaName;
         private Text _arenaEffect;
         private Text _roundInfo;
@@ -88,7 +89,7 @@ namespace ComboTactics.UI
 
             IBattleController side0 = new HumanController(this, _match.Mode == GameMode.LocalPvp);
             IBattleController side1 = _match.OpponentAi != null
-                ? (IBattleController)new RuleBasedAIController(_match.OpponentAi, _match.Setup.Seed + 17)
+                ? (IBattleController)new SpecialAwareAiController(new RuleBasedAIController(_match.OpponentAi, _match.Setup.Seed + 17), () => _incomingSkill)
                 : new HumanController(this, true);
             var director = new BattleDirector(_engine, side0, side1, this);
             _routine = App.Host.StartCoroutine(Coroutines.Guard(RunBattle(director), OnError));
@@ -274,73 +275,181 @@ namespace ComboTactics.UI
         }
 
         /// <summary>
-        /// Janela de resposta (GDD §5.5, R3): um marcador cruza a barra e o defensor clica (ou aperta Espaço/Enter)
-        /// quando ele passa pelo alvo. Perfeito = contra-ataque, bom = desvio, fora disso o golpe acerta.
+        /// Janela de resposta dinâmica e fluida (GDD §5.5, R3): a Velocidade do defensor amplia a zona de acerto
+        /// e suaviza a travessia do marcador, enquanto Golpes Especiais (Super) aceleram a barra drasticamente.
         /// </summary>
-        private IEnumerator ReactionWindow(int side, float sweepSeconds, Action<ReactionResult> reply)
+        private IEnumerator ReactionWindow(int side, float baseWindowSeconds, Action<ReactionResult> reply)
         {
-            // A janela ocupa a faixa do menu de ações, que fica vazia enquanto os golpes se resolvem.
-            const float barWidth = 420f, barHeight = 26f;
-            const float barX = (Theme.Width - barWidth) * 0.5f, barY = 648f;
-            float target = UnityEngine.Random.Range(QteConfig.TargetMin, QteConfig.TargetMax);
-            float goodWidth = Mathf.Min(1f, 2f * QteConfig.GoodSeconds / sweepSeconds) * barWidth;
-            float perfectWidth = Mathf.Min(1f, 2f * QteConfig.PerfectSeconds / sweepSeconds) * barWidth;
+            var defender = _engine.State.Sides[side].Active;
+            var attacker = _engine.State.Sides[1 - side].Active;
+            int defSpeed = defender.Spec.Speed;
+            int atkSpeed = attacker.Spec.Speed;
+            bool isSpecial = _incomingSkill != null && _incomingSkill.IsSpecial;
+            QteParams qte = QteConfig.Compute(defSpeed, atkSpeed, isSpecial);
+
+            const float barWidth = 440f, barHeight = 28f;
+            const float barX = (Theme.Width - barWidth) * 0.5f, barY = 644f;
+            float targetX = qte.TargetNormalized * barWidth;
+            float goodWidth = Mathf.Clamp(2f * qte.GoodSeconds / qte.SweepSeconds, 0.04f, 0.55f) * barWidth;
+            float perfectWidth = Mathf.Clamp(2f * qte.PerfectSeconds / qte.SweepSeconds, 0.018f, 0.28f) * barWidth;
 
             var root = Ui.Node(_overlay, "ReactionWindow", 0, 0, Theme.Width, Theme.Height);
-            bool clicked = false;
-            var catcher = Ui.Button(root, "", 0, 0, Theme.Width, Theme.Height, () => clicked = true, new Color(0f, 0f, 0f, 0.20f));
-            catcher.transition = Selectable.Transition.None;
-            var title = Ui.Label(root, _match.SideNames[side] + ": DEFENDA!", 0, 604, Theme.Width, 38, 28, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold, true);
-            Ui.Label(root, "Clique (ou Espaço) no alvo · azul = desvio · amarelo = contra-ataque", 0, 682, Theme.Width, 24, 14, Theme.Text, TextAnchor.MiddleCenter, FontStyle.Normal, true);
-            var barFrame = Ui.Box(root, "BarFrame", barX - 3f, barY - 3f, barWidth + 6f, barHeight + 6f, new Color(0.75f, 0.58f, 0.24f, 0.9f));
-            var bar = Ui.Box(barFrame.transform, "Bar", 3f, 3f, barWidth, barHeight, new Color(0.05f, 0.06f, 0.09f, 0.95f));
-            Ui.Box(bar.transform, "Good", target * barWidth - goodWidth * 0.5f, 3, goodWidth, barHeight - 6, new Color(0.22f, 0.62f, 0.95f, 0.92f));
-            Ui.Box(bar.transform, "Perfect", target * barWidth - perfectWidth * 0.5f, 3, perfectWidth, barHeight - 6, Theme.Gold);
-            var marker = Ui.Box(bar.transform, "Marker", 0, -6, 6, barHeight + 12, Color.white);
+            var hitBox = Ui.Box(root, "HitCatcher", 0, 0, Theme.Width, Theme.Height, new Color(0f, 0f, 0f, isSpecial ? 0.28f : 0.16f));
+            hitBox.raycastTarget = true;
+            var catcher = hitBox.gameObject.AddComponent<ReactionInputCatcher>();
 
-            // Preparação: o marcador fica parado por um tempo sorteado. Clicar cedo demais conta como erro.
-            float telegraph = UnityEngine.Random.Range(QteConfig.TelegraphMin, QteConfig.TelegraphMax);
-            float waited = 0f;
-            while (waited < telegraph && !clicked && !KeyPressed())
+            Color frameColor = isSpecial ? new Color(0.96f, 0.28f, 0.18f, 0.96f) : Theme.BorderGold;
+            string headerText = isSpecial
+                ? "⚡ " + _match.SideNames[side].ToUpper() + ": DEFENDA O ESPECIAL! (BARRA RÁPIDA)"
+                : _match.SideNames[side] + ": DEFENDA COM " + defender.Spec.Name.ToUpper() + "!";
+            var title = Ui.Label(root, headerText, 0, 604, Theme.Width, 34, 24, isSpecial ? Theme.Bad : Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold, true);
+
+            string speedSign = qte.SpeedBonusPercent >= 0 ? "+" + qte.SpeedBonusPercent + "%" : qte.SpeedBonusPercent + "%";
+            string subText = isSpecial
+                ? "Golpe Supremo em curso! Janela reduzida e velocidade extrema · Clique ou Espaço no alvo"
+                : "VEL " + defSpeed + " (" + speedSign + " janela de reflexo) · Azul = Desvio · Dourado = Contra-ataque";
+            Color subColor = !isSpecial && qte.SpeedBonusPercent >= 15 ? Theme.Good : Theme.Text;
+            Ui.Label(root, subText, 0, 680, Theme.Width, 24, 14, subColor, TextAnchor.MiddleCenter, FontStyle.Bold, true);
+
+            var barFrame = Ui.Box(root, "BarFrame", barX - 3f, barY - 3f, barWidth + 6f, barHeight + 6f, frameColor);
+            var bar = Ui.Box(barFrame.transform, "Bar", 3f, 3f, barWidth, barHeight, new Color(0.04f, 0.05f, 0.08f, 0.96f));
+
+            Color goodBaseColor = new Color(0.20f, 0.64f, 0.98f, 0.92f);
+            Color perfBaseColor = Theme.Gold;
+            var goodBox = Ui.Box(bar.transform, "Good", targetX - goodWidth * 0.5f, 3f, goodWidth, barHeight - 6f, goodBaseColor);
+            var perfBox = Ui.Box(bar.transform, "Perfect", targetX - perfectWidth * 0.5f, 3f, perfectWidth, barHeight - 6f, perfBaseColor);
+
+            var trail = Ui.Picture(bar.transform, "Trail", Art.VfxShard, 0, 0, 44f, barHeight - 4f);
+            trail.color = new Color(1f, 0.92f, 0.65f, 0f);
+            var markerGlow = Ui.Picture(bar.transform, "MarkerGlow", Art.VfxOrb, 0, 0, 34f, barHeight + 22f);
+            markerGlow.color = new Color(1f, 0.95f, 0.78f, 0.75f);
+            var marker = Ui.Box(bar.transform, "Marker", 0, -6f, 6f, barHeight + 12f, Color.white);
+            Ui.PlaceCentered(marker.rectTransform, 0f, barHeight * 0.5f, 6f, barHeight + 12f);
+            Ui.PlaceCentered(markerGlow.rectTransform, 0f, barHeight * 0.5f, 34f, barHeight + 22f);
+
+            // Breve entrada suave (0.14s) para o olho focar na barra sem travar o marcador nem punir clique residual.
+            float leadIn = 0f;
+            while (leadIn < QteConfig.LeadInSeconds)
             {
-                waited += Time.unscaledDeltaTime;
+                leadIn += Time.unscaledDeltaTime;
+                float a = Mathf.Clamp01(leadIn / QteConfig.LeadInSeconds);
+                markerGlow.color = new Color(1f, 0.95f, 0.78f, 0.75f * a);
                 yield return null;
             }
 
+            // Limpa eventual clique ocorrido durante o fade-in para o jogador nunca perder por clique residual.
+            bool ignoreInitial = catcher.Pressed;
+
             ReactionResult result = ReactionResult.Miss;
-            if (waited >= telegraph)
+            float elapsed = 0f;
+            float limit = qte.SweepSeconds + qte.GoodSeconds * 0.75f;
+            float finalMarkerX = barWidth;
+
+            while (elapsed <= limit)
             {
-                float start = Time.unscaledTime;
-                float limit = sweepSeconds + QteConfig.GoodSeconds;
-                while (true)
+                float norm = Mathf.Clamp01(elapsed / qte.SweepSeconds);
+                float mx = norm * barWidth;
+                finalMarkerX = mx;
+
+                Ui.PlaceCentered(marker.rectTransform, mx, barHeight * 0.5f, 6f, barHeight + 12f);
+                Ui.PlaceCentered(markerGlow.rectTransform, mx, barHeight * 0.5f, 34f, barHeight + 22f);
+                Ui.PlaceCentered(trail.rectTransform, Mathf.Max(12f, mx - 18f), barHeight * 0.5f, Mathf.Min(44f, mx), barHeight - 6f);
+                trail.color = new Color(isSpecial ? 1f : 0.65f, 0.88f, 1f, 0.48f);
+
+                // Destaca visualmente a zona quando o marcador passa sobre o alvo.
+                float timeError = Mathf.Abs(elapsed - qte.TargetNormalized * qte.SweepSeconds);
+                bool inPerfect = timeError <= qte.PerfectSeconds;
+                bool inGood = timeError <= qte.GoodSeconds;
+                goodBox.color = inGood ? Color.Lerp(goodBaseColor, Color.white, 0.38f) : goodBaseColor;
+                perfBox.color = inPerfect ? Color.white : perfBaseColor;
+
+                if (isSpecial)
                 {
-                    float elapsed = Time.unscaledTime - start;
-                    marker.rectTransform.anchoredPosition = new Vector2(Mathf.Clamp01(elapsed / sweepSeconds) * barWidth - 4f, 8f);
-                    if (clicked || KeyPressed())
-                    {
-                        result = QteConfig.Classify(elapsed - target * sweepSeconds);
-                        break;
-                    }
-                    if (elapsed > limit) break;
-                    yield return null;
+                    float pulse = 0.5f + 0.5f * Mathf.Sin(elapsed * 28f);
+                    barFrame.color = Color.Lerp(frameColor, Theme.Gold, pulse * 0.45f);
                 }
+
+                bool mouseOrTouchAdded = !ignoreInitial && catcher.Pressed;
+                if (mouseOrTouchAdded || KeyOrMouseDown())
+                {
+                    result = QteConfig.Classify(elapsed - qte.TargetNormalized * qte.SweepSeconds, qte.PerfectSeconds, qte.GoodSeconds);
+                    break;
+                }
+                if (!catcher.Pressed) ignoreInitial = false;
+
+                yield return null;
+                elapsed += Time.unscaledDeltaTime;
             }
 
+            Color resColor = result == ReactionResult.Counter ? Theme.Gold : result == ReactionResult.Dodge ? Theme.Good : Theme.Bad;
             title.text = BattleText.Reaction(result);
-            title.color = result == ReactionResult.Miss ? Theme.Bad : Theme.Good;
-            yield return new WaitForSecondsRealtime(0.45f);
+            title.color = resColor;
+            marker.color = resColor;
+            markerGlow.color = resColor;
+
+            // Anel de confirmação imediata exatamente no ponto onde o marcador parou.
+            var hitBurst = Ui.Picture(bar.transform, "Burst", Art.VfxRing, 0, 0, 24f, 24f);
+            float burstTimer = 0f;
+            while (burstTimer < 0.32f)
+            {
+                burstTimer += Time.unscaledDeltaTime;
+                float p = Mathf.Clamp01(burstTimer / 0.32f);
+                float sz = Mathf.Lerp(22f, 96f, p);
+                Ui.PlaceCentered(hitBurst.rectTransform, finalMarkerX, barHeight * 0.5f, sz, sz);
+                hitBurst.color = new Color(resColor.r, resColor.g, resColor.b, 1f - p);
+                yield return null;
+            }
+
             UnityEngine.Object.Destroy(root.gameObject);
             _inputRoutine = null;
             reply(result);
         }
 
-        private static bool KeyPressed()
+        private static bool KeyOrMouseDown()
         {
 #if ENABLE_LEGACY_INPUT_MANAGER
-            return Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Return);
+            return Input.GetMouseButtonDown(0) || Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Return);
 #else
             return false;
 #endif
+        }
+
+        /// <summary>Ajusta a reação da IA quando ela tenta defender um Golpe Especial (Super) ou quando há grande diferença de Velocidade.</summary>
+        private sealed class SpecialAwareAiController : IBattleController
+        {
+            private readonly RuleBasedAIController _inner;
+            private readonly Func<SkillSpec> _currentSkill;
+
+            public SpecialAwareAiController(RuleBasedAIController inner, Func<SkillSpec> currentSkill)
+            {
+                _inner = inner;
+                _currentSkill = currentSkill;
+            }
+
+            public void RequestAction(IBattleEngine engine, int side, Action<ICommand> reply)
+            {
+                _inner.RequestAction(engine, side, reply);
+            }
+
+            public void RequestReaction(IBattleEngine engine, int side, float windowSeconds, Action<ReactionResult> reply)
+            {
+                _inner.RequestReaction(engine, side, windowSeconds, raw =>
+                {
+                    var skill = _currentSkill();
+                    if (skill != null && skill.IsSpecial)
+                    {
+                        // Contra um Super, contra-ataque vira no máximo desvio, e desvios normais falham na maioria das vezes.
+                        if (raw == ReactionResult.Counter) raw = ReactionResult.Dodge;
+                        else if (raw == ReactionResult.Dodge) raw = ReactionResult.Miss;
+                    }
+                    reply(raw);
+                });
+            }
+
+            public void RequestForcedSwitch(IBattleEngine engine, int side, Action<int> reply)
+            {
+                _inner.RequestForcedSwitch(engine, side, reply);
+            }
         }
     }
 }

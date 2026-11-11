@@ -1,30 +1,91 @@
+using System;
 using System.Collections.Generic;
 using System.Text;
 using ComboTactics.Core;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 namespace ComboTactics.UI
 {
+    /// <summary>Parâmetros dinâmicos da barra de reação calculados a partir da Velocidade do defensor e do tipo de golpe.</summary>
+    public struct QteParams
+    {
+        public float SweepSeconds;
+        public float GoodSeconds;
+        public float PerfectSeconds;
+        public float TargetNormalized;
+        public int SpeedBonusPercent;
+        public bool IsSpecial;
+    }
+
     /// <summary>Números do QTE (SYSTEM-DESIGN §3.2). O núcleo só recebe o resultado; o timing é medido aqui.</summary>
     public static class QteConfig
     {
-        /// <summary>Clique a até 30 ms do alvo: contra-ataque.</summary>
-        public static float PerfectSeconds = 0.03f;
-        /// <summary>Clique a até 80 ms do alvo: desvio.</summary>
-        public static float GoodSeconds = 0.08f;
+        /// <summary>Base de contra-ataque antes do multiplicador de Velocidade.</summary>
+        public static float PerfectSeconds = 0.030f;
+        /// <summary>Base de desvio antes do multiplicador de Velocidade.</summary>
+        public static float GoodSeconds = 0.078f;
         /// <summary>Posição do alvo na barra, sorteada a cada golpe.</summary>
-        public static float TargetMin = 0.55f;
-        public static float TargetMax = 0.85f;
-        /// <summary>Espera antes de o marcador partir, sorteada para o clique não virar ritmo decorado.</summary>
-        public static float TelegraphMin = 0.45f;
-        public static float TelegraphMax = 1.10f;
+        public static float TargetMin = 0.52f;
+        public static float TargetMax = 0.84f;
+        /// <summary>Breve preparação fluida antes do marcador partir.</summary>
+        public static float LeadInSeconds = 0.14f;
+
+        public static QteParams Compute(int defenderSpeed, int attackerSpeed, bool isSpecial)
+        {
+            // Velocidade dos lutadores vai de ~23 (Tanques) até ~90+ (Guerreiros) e ~117 com evoluções.
+            float speedNorm = Mathf.Clamp((defenderSpeed - 20f) / 75f, 0f, 1.35f);
+            float relative = Mathf.Clamp((defenderSpeed - attackerSpeed) / 110f, -0.18f, 0.25f);
+            float windowMult = Mathf.Clamp(0.84f + 0.75f * speedNorm + relative, 0.78f, 1.95f);
+
+            // Quanto maior a velocidade do defensor, mais ampla a zona e mais controlada a travessia do marcador.
+            float sweep = Mathf.Lerp(0.72f, 1.04f, Mathf.Clamp01(speedNorm));
+            float good = GoodSeconds * windowMult;
+            float perfect = PerfectSeconds * windowMult;
+            float target = UnityEngine.Random.Range(TargetMin, TargetMax);
+
+            if (isSpecial)
+            {
+                // Golpe Especial (Super): barra muito mais rápida e zona reduzida!
+                sweep *= 0.56f;
+                good *= 0.60f;
+                perfect *= 0.45f;
+                target = UnityEngine.Random.Range(0.60f, 0.88f);
+            }
+
+            return new QteParams
+            {
+                SweepSeconds = sweep,
+                GoodSeconds = good,
+                PerfectSeconds = perfect,
+                TargetNormalized = target,
+                SpeedBonusPercent = Mathf.RoundToInt((windowMult - 1f) * 100f),
+                IsSpecial = isSpecial
+            };
+        }
 
         public static ReactionResult Classify(float errorSeconds)
         {
+            return Classify(errorSeconds, PerfectSeconds, GoodSeconds);
+        }
+
+        public static ReactionResult Classify(float errorSeconds, float perfectSeconds, float goodSeconds)
+        {
             float error = Mathf.Abs(errorSeconds);
-            if (error <= PerfectSeconds) return ReactionResult.Counter;
-            return error <= GoodSeconds ? ReactionResult.Dodge : ReactionResult.Miss;
+            if (error <= perfectSeconds) return ReactionResult.Counter;
+            return error <= goodSeconds ? ReactionResult.Dodge : ReactionResult.Miss;
+        }
+    }
+
+    /// <summary>Captura o clique no instante exato em que o botão do mouse ou toque desce (sem atraso de soltar o botão).</summary>
+    public sealed class ReactionInputCatcher : MonoBehaviour, IPointerDownHandler
+    {
+        public bool Pressed { get; private set; }
+
+        public void OnPointerDown(PointerEventData eventData)
+        {
+            Pressed = true;
         }
     }
 

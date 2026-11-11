@@ -133,6 +133,7 @@ namespace ComboTactics.UI
 
         private IEnumerator PlaySkill(SkillUsed e)
         {
+            _incomingSkill = e.Skill;
             Apply(e);
             var attacker = _fighters[e.Side];
             var defender = _fighters[1 - e.Side];
@@ -142,17 +143,30 @@ namespace ComboTactics.UI
 
             if (e.Skill.IsSpecial)
             {
-                Say("ESPECIAL! " + Who(e.Side, e.FighterIndex) + " usou " + e.Skill.Name + "!");
-                var flash = Ui.Box(_overlay, "SpecialFlash", 0, 0, Theme.Width, Theme.Height, new Color(elemColor.r, elemColor.g, elemColor.b, 0f));
+                Say("★ GOLPE ESPECIAL! " + Who(e.Side, e.FighterIndex) + " invoca " + e.Skill.Name + "!");
+                _stage.Shake(8.5f, 0.56f);
+                var flash = Ui.Box(_overlay, "SpecialFlash", 0, 0, Theme.Width, Theme.Height, new Color(0.02f, 0.01f, 0.04f, 0f));
+                var cutIn = Ui.Frame(_overlay, "SpecialCutIn", 220, 178, 840, 96, new Color(0.06f, 0.04f, 0.08f, 0.94f), elemColor, 2.5f);
+                Ui.Picture(cutIn, "Portrait", Art.Fighter(fighterSpec.Id, fighterSpec.Element, fighterSpec.Class), 12, 6, 80, 80);
+                Ui.Label(cutIn, "★ ATAQUE ESPECIAL — " + fighterSpec.Name.ToUpper(), 106, 10, 714, 30, 18, Theme.Gold, TextAnchor.MiddleLeft, FontStyle.Bold, true);
+                Ui.Label(cutIn, e.Skill.Name.ToUpper(), 106, 40, 714, 44, 34, elemColor, TextAnchor.MiddleLeft, FontStyle.Bold, true);
+
+                var pillar = SpawnVfx(Art.VfxPillar, attacker.CenterX, attacker.CenterY, 180f, 340f, elemColor);
                 var aura = SpawnVfx(Art.VfxRing, attacker.CenterX, attacker.CenterY, 80f, 80f, elemColor);
-                yield return Tween(0.52f, t =>
+                var outerRing = SpawnVfx(Art.VfxRing, attacker.CenterX, attacker.CenterY, 140f, 140f, Theme.Gold);
+                yield return Tween(0.62f, t =>
                 {
                     float pulse = Mathf.Sin(t * Mathf.PI);
-                    attacker.SetScale(1f + 0.30f * pulse);
-                    flash.color = new Color(elemColor.r * 0.6f, elemColor.g * 0.6f, elemColor.b * 0.6f, 0.38f * pulse);
-                    PlaceVfx(aura, attacker.CenterX, attacker.CenterY, Mathf.Lerp(110f, 340f, t), Mathf.Lerp(110f, 340f, t), 1f - t);
+                    attacker.SetScale(1f + 0.32f * pulse);
+                    flash.color = new Color(elemColor.r * 0.35f, elemColor.g * 0.35f, elemColor.b * 0.35f, 0.48f * pulse);
+                    PlaceVfx(pillar, attacker.CenterX, attacker.CenterY - 20f * t, 190f, 360f * pulse, pulse * 0.85f);
+                    PlaceVfx(aura, attacker.CenterX, attacker.CenterY, Mathf.Lerp(100f, 360f, t), Mathf.Lerp(100f, 360f, t), 1f - t);
+                    PlaceVfx(outerRing, attacker.CenterX, attacker.CenterY, Mathf.Lerp(160f, 440f, t), Mathf.Lerp(160f, 440f, t), (1f - t) * 0.8f);
                 });
+                UnityEngine.Object.Destroy(outerRing.gameObject);
                 UnityEngine.Object.Destroy(aura.gameObject);
+                UnityEngine.Object.Destroy(pillar.gameObject);
+                UnityEngine.Object.Destroy(cutIn.parent.gameObject);
                 UnityEngine.Object.Destroy(flash.gameObject);
             }
             else
