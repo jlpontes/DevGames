@@ -6,7 +6,7 @@ namespace ComboTactics.Game
     /// <summary>
     /// Conteúdo do MVP. Atributos dos 9 personagens: GDD §4. Regras e valores: GDD §5.7 (R1–R10) e ADR-004.
     /// Poder e efeito das habilidades, atributos do Boss e preços ainda estavam em aberto nos documentos;
-    /// os valores daqui são o ponto de partida validado pela simulação de balanceamento (ver docs/MVP.md).
+    /// os valores daqui são o ponto de partida validado pela simulação de balanceamento (ver game/README.md).
     /// </summary>
     public static class BuiltInContent
     {

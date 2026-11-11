@@ -132,7 +132,8 @@ namespace ComboTactics.Tests
                 }
                 sb.AppendLine();
             }
-            TestContext.Out.WriteLine(sb.ToString());
+            // Assert.Pass leva o relatório para o painel de detalhes do Test Runner do Unity.
+            Assert.Pass(sb.ToString());
         }
 
         private static void AppendTeamLine(StringBuilder sb, string label, AIProfile profile)
