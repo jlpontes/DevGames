@@ -102,7 +102,7 @@ namespace ComboTactics.UI
 
             var letterbox = new GameObject("Letterbox", typeof(RectTransform)).AddComponent<Image>();
             letterbox.transform.SetParent(canvasGo.transform, false);
-            letterbox.color = Color.black;
+            letterbox.color = Theme.Obsidian;
             letterbox.raycastTarget = false;
             Ui.Stretch(letterbox.rectTransform);
 

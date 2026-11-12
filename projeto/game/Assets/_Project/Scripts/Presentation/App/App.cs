@@ -51,6 +51,7 @@ namespace ComboTactics.UI
             _overlayLayer = Ui.Node(stage, "Overlay", 0, 0, Theme.Width, Theme.Height);
             Errors = new ErrorReporter(ShowErrorDialog);
             Ui.OnPlayerMessage = Notify;
+            Ui.OverlayRoot = _overlayLayer;
             CampaignStory.Bind(services);
         }
 
@@ -60,6 +61,8 @@ namespace ComboTactics.UI
             if (_toast != null) UnityEngine.Object.Destroy(_toast);
             Errors.Context = null;
             Redraw(screen);
+            // Tela nova entra com um esmaecer curto; redesenhar a mesma tela (Rebuild) é instantâneo.
+            _currentRoot.gameObject.AddComponent<ScreenFader>().Begin();
         }
 
         internal void Redraw(UiScreen screen)
@@ -177,10 +180,12 @@ namespace ComboTactics.UI
         public void Notify(string message)
         {
             if (_toast != null) UnityEngine.Object.Destroy(_toast);
-            var box = Ui.Box(_overlayLayer, "Toast", 420, 12, 600, 48, new Color(0.10f, 0.10f, 0.14f, 0.97f));
-            Ui.Label(box.transform, message, 10, 0, 580, 48, 18, Theme.Gold);
-            _toast = box.gameObject;
-            UnityEngine.Object.Destroy(_toast, 3f);
+            var frame = Ui.Frame(_overlayLayer, "Toast", 360, 14, 560, 54, Theme.PanelSolid, Theme.BorderGold, 2f);
+            var gem = Ui.Picture(frame, "Gem", Art.Diamond, 14, 16, 18, 18);
+            gem.color = Theme.Gold;
+            Ui.Label(frame, message, 42, 0, 500, 50, Theme.FontBody + 1, Theme.Text, TextAnchor.MiddleLeft, FontStyle.Bold);
+            _toast = frame.parent.gameObject;
+            _toast.AddComponent<ToastAnimator>().Begin();
         }
 
         private void ShowErrorDialog(string message, string debugInfo)

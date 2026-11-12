@@ -1,4 +1,5 @@
 using System;
+using System.Text;
 using ComboTactics.Game;
 using UnityEngine;
 using UnityEngine.UI;
@@ -12,6 +13,9 @@ namespace ComboTactics.UI
     public static class Ui
     {
         private static Font _font;
+
+        /// <summary>Camada acima das telas (dicas, avisos). O App define na inicialização.</summary>
+        public static RectTransform OverlayRoot;
 
         /// <summary>Chamado quando um clique gera um erro de regra com mensagem para o jogador.</summary>
         public static Action<string> OnPlayerMessage;
@@ -63,24 +67,67 @@ namespace ComboTactics.UI
             return image;
         }
 
-        /// <summary>Painel com moldura metálica/elemental e brilho interno no topo, integrado à estética de arena.</summary>
+        /// <summary>
+        /// Painel do relicário: moldura de bronze chanfrada (9-slice) com preenchimento de pedra, luz no topo e sombra
+        /// na base. Devolve o miolo; <c>.parent</c> é a moldura (a Image dela recebe a cor da borda).
+        /// </summary>
         public static RectTransform Frame(Transform parent, string name, float x, float y, float w, float h, Color fill, Color border, float thickness = 2f)
         {
             var outer = Box(parent, name + "Border", x, y, w, h, border);
+            outer.sprite = Art.FrameSprite;
+            outer.type = Image.Type.Sliced;
+            outer.pixelsPerUnitMultiplier = thickness >= 2.5f ? 0.9f : thickness <= 1.5f ? 1.6f : 1.25f;
+
             var inner = Box(outer.transform, name, thickness, thickness, w - thickness * 2f, h - thickness * 2f, fill);
-            Box(inner.transform, "Highlight", 0f, 0f, w - thickness * 2f, 1.5f, new Color(1f, 0.95f, 0.85f, 0.10f));
+            if (fill.a > 0.01f)
+            {
+                inner.sprite = Art.FillSprite;
+                inner.type = Image.Type.Sliced;
+                float iw = w - thickness * 2f, ih = h - thickness * 2f;
+                if (ih >= 28f)
+                {
+                    var sheen = Picture(inner.transform, "Sheen", Art.GradientUp, 0f, 0f, iw, Mathf.Min(ih * 0.45f, 46f));
+                    sheen.uvRect = new Rect(0f, 1f, 1f, -1f);
+                    sheen.color = new Color(1f, 0.93f, 0.80f, 0.06f);
+                    var shade = Picture(inner.transform, "Shade", Art.GradientUp, 0f, ih - Mathf.Min(ih * 0.4f, 40f), iw, Mathf.Min(ih * 0.4f, 40f));
+                    shade.color = new Color(0f, 0f, 0f, 0.22f);
+                }
+                if (w >= 220f && h >= 90f && thickness >= 2f)
+                {
+                    // Rebites em losango nos cantos de cima: o fragmento do cristal preso no bronze.
+                    Color rivet = Color.Lerp(border, Color.white, 0.25f);
+                    var left = Picture(inner.transform, "RivetL", Art.Diamond, 0f, 0f, 9f, 9f);
+                    PlaceCentered(left.rectTransform, 4f, 4f, 9f, 9f);
+                    left.color = rivet;
+                    var right = Picture(inner.transform, "RivetR", Art.Diamond, 0f, 0f, 9f, 9f);
+                    PlaceCentered(right.rectTransform, iw - 4f, 4f, 9f, 9f);
+                    right.color = rivet;
+                }
+            }
             return inner.rectTransform;
+        }
+
+        /// <summary>Sombra macia projetada sob um painel grande (desenhe antes do painel).</summary>
+        public static Image Shadow(Transform parent, float x, float y, float w, float h, float alpha = 0.55f)
+        {
+            var shadow = Box(parent, "DropShadow", x - 10f, y - 4f, w + 20f, h + 20f, new Color(0f, 0f, 0f, alpha));
+            shadow.sprite = Art.GlowSprite;
+            shadow.type = Image.Type.Sliced;
+            return shadow;
         }
 
         /// <summary>Fundo atmosférico usando a arte do torneio ou de uma arena com movimento suave e fagulhas de ambiente.</summary>
         public static void Backdrop(Transform parent, Texture customArt = null, float brightness = 0.26f)
         {
-            Box(parent, "Base", 0, 0, Theme.Width, Theme.Height, new Color(0.05f, 0.04f, 0.07f, 1f));
+            Box(parent, "Base", 0, 0, Theme.Width, Theme.Height, Theme.Obsidian);
             var pic = Picture(parent, "BackdropArt", customArt != null ? customArt : Art.Menu, -24, -14, 1328, 748);
             pic.color = new Color(brightness, brightness * 0.95f, brightness * 1.05f, 1f);
             AddAmbientSparks(parent, pic.rectTransform, new Color(1f, 0.78f, 0.36f, 0.45f), 14);
-            Box(parent, "TopVignette", 0, 0, Theme.Width, 84, new Color(0.04f, 0.03f, 0.06f, 0.72f));
-            Box(parent, "BottomBar", 0, 78, Theme.Width, 2, Theme.BorderSubtle);
+            var top = Picture(parent, "TopVignette", Art.GradientUp, 0, 0, Theme.Width, 150);
+            top.uvRect = new Rect(0f, 1f, 1f, -1f);
+            top.color = Theme.WithAlpha(Theme.Obsidian, 0.85f);
+            var bottom = Picture(parent, "BottomVignette", Art.GradientUp, 0, Theme.Height - 190, Theme.Width, 190);
+            bottom.color = Theme.WithAlpha(Theme.Obsidian, 0.80f);
         }
 
         /// <summary>Adiciona partículas flutuantes e leve respiração de câmera a um fundo de menu.</summary>
@@ -114,7 +161,7 @@ namespace ComboTactics.UI
             label.verticalOverflow = VerticalWrapMode.Overflow;
             label.supportRichText = true;
             label.raycastTarget = false;
-            label.text = text;
+            label.text = Safe(text);
             if (outline)
             {
                 var effect = rt.gameObject.AddComponent<Outline>();
@@ -124,36 +171,139 @@ namespace ComboTactics.UI
             return label;
         }
 
+        /// <summary>
+        /// Botão de placa forjada. A cor escolhe o estilo: <see cref="Theme.ButtonPrimary"/> ganha aro dourado,
+        /// <see cref="Theme.ButtonDanger"/> fica em brasa, transparente vira área de clique invisível; o resto é ferro tingido.
+        /// Hover, clique, desabilitado e selecionado ficam no <see cref="ButtonFx"/>.
+        /// </summary>
         public static Button Button(Transform parent, string label, float x, float y, float w, float h, Action onClick,
             Color color, int fontSize = 20)
         {
+            bool invisible = color.a < 0.01f;
+            bool isPrimary = Near(color, Theme.ButtonPrimary);
             var image = Box(parent, "Button", x, y, w, h, color);
             image.raycastTarget = true;
 
-            bool isPrimary = Mathf.Abs(color.r - Theme.ButtonPrimary.r) < 0.08f && Mathf.Abs(color.g - Theme.ButtonPrimary.g) < 0.08f;
-            Color rim = isPrimary ? Theme.Gold : new Color(0.58f, 0.50f, 0.38f, 0.55f);
-            var outline = image.gameObject.AddComponent<Outline>();
-            outline.effectColor = rim;
-            outline.effectDistance = new Vector2(1.5f, -1.5f);
-            Box(image.transform, "TopGloss", 2f, 2f, Mathf.Max(0f, w - 4f), Mathf.Min(3f, h * 0.12f), new Color(1f, 0.95f, 0.85f, isPrimary ? 0.22f : 0.08f));
+            Image glow = null;
+            if (!invisible)
+            {
+                image.sprite = Art.ButtonSprite;
+                image.type = Image.Type.Sliced;
+                glow = Box(image.transform, "Glow", -7f, -7f, w + 14f, h + 14f, Theme.WithAlpha(isPrimary ? Theme.Gold : new Color(1f, 0.86f, 0.58f), 0f));
+                glow.sprite = Art.GlowSprite;
+                glow.type = Image.Type.Sliced;
+                var rim = Box(image.transform, "Rim", 0f, 0f, w, h, isPrimary ? Theme.WithAlpha(Theme.Gold, 0.95f) : new Color(0.62f, 0.50f, 0.36f, 0.75f));
+                rim.sprite = Art.FrameSprite;
+                rim.type = Image.Type.Sliced;
+                rim.pixelsPerUnitMultiplier = 1.6f;
+            }
 
             var button = image.gameObject.AddComponent<Button>();
             button.targetGraphic = image;
             var colors = button.colors;
             colors.normalColor = Color.white;
-            colors.highlightedColor = new Color(1.12f, 1.10f, 1.05f, 1f);
-            colors.pressedColor = new Color(0.75f, 0.72f, 0.68f, 1f);
+            colors.highlightedColor = new Color(1.10f, 1.08f, 1.04f, 1f);
+            colors.pressedColor = new Color(0.82f, 0.80f, 0.76f, 1f);
             colors.selectedColor = Color.white;
-            colors.disabledColor = new Color(0.42f, 0.40f, 0.44f, 0.65f);
-            colors.fadeDuration = 0.06f;
+            colors.disabledColor = new Color(0.46f, 0.44f, 0.48f, 0.72f);
+            colors.colorMultiplier = 1f;
+            colors.fadeDuration = 0.08f;
             button.colors = colors;
             var navigation = button.navigation;
             navigation.mode = Navigation.Mode.None;
             button.navigation = navigation;
 
             if (onClick != null) button.onClick.AddListener(() => Click(onClick));
-            Label(image.transform, label, 6f, 0f, w - 12f, h, fontSize, Theme.Text, TextAnchor.MiddleCenter, FontStyle.Bold, !string.IsNullOrEmpty(label));
+            Text text = null;
+            if (!string.IsNullOrEmpty(label))
+            {
+                text = Label(image.transform, label, 8f, 0f, w - 16f, h, fontSize, Theme.Text, TextAnchor.MiddleCenter, FontStyle.Bold);
+                var drop = text.gameObject.AddComponent<UnityEngine.UI.Shadow>();
+                drop.effectColor = new Color(0f, 0f, 0f, 0.85f);
+                drop.effectDistance = new Vector2(1f, -1.5f);
+            }
+            if (!invisible) image.gameObject.AddComponent<ButtonFx>().Setup(button, glow, text, isPrimary ? 0.85f : 0.55f);
             return button;
+        }
+
+        /// <summary>Marca um botão como selecionado (brilho fixo).</summary>
+        public static void MarkSelected(Button button, bool selected = true)
+        {
+            var fx = button.GetComponent<ButtonFx>();
+            if (fx != null) fx.Selected = selected;
+        }
+
+        /// <summary>Dica que aparece ao deixar o mouse sobre o elemento (precisa receber raycast).</summary>
+        public static void Tooltip(Component target, string title, string body)
+        {
+            var trigger = target.gameObject.GetComponent<TooltipTrigger>() ?? target.gameObject.AddComponent<TooltipTrigger>();
+            trigger.Title = Safe(title);
+            trigger.Body = Safe(body);
+        }
+
+        private static bool Near(Color a, Color b)
+        {
+            return Mathf.Abs(a.r - b.r) < 0.06f && Mathf.Abs(a.g - b.g) < 0.06f && Mathf.Abs(a.b - b.b) < 0.06f;
+        }
+
+        /// <summary>
+        /// A fonte embutida (a única que funciona no WebGL) não tem emoji nem vários símbolos. Troca os que aparecem
+        /// nos textos do jogo por equivalentes da própria fonte e remove o resto, para nunca sobrar um quadrado vazio.
+        /// </summary>
+        public static string Safe(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return text;
+            StringBuilder sb = null;
+            for (int i = 0; i < text.Length; i++)
+            {
+                char c = text[i];
+                string swap = null;
+                bool drop = false;
+                switch (c)
+                {
+                    case '\u2605': case '\u2726': case '\u2727': case '\u2B50': swap = "\u2666"; break; // ★ ✦ ✧ ⭐ → ♦
+                    case '\u263E': case '\u263D': swap = "\u25CA"; break;                                   // ☾ → ◊
+                    case '\u25B8': case '\u25B6': swap = "\u25BA"; break;                                   // ▸ ▶ → ►
+                    case '\u25C2': case '\u25C0': swap = "\u25C4"; break;                                   // ◂ ◀ → ◄
+                    case '\u2714': case '\u2713': swap = "\u2022"; break;                                   // ✓ → •
+                    case '\u2794': case '\u279C': case '\u27A4': swap = "\u2192"; break;                     // ➔ → →
+                    case '\u2694': case '\u26A1': case '\u23ED': case '\uFE0F': case '\u2728': drop = true; break;
+                    default:
+                        if (char.IsSurrogate(c)) drop = true; // emoji
+                        break;
+                }
+                if (swap == null && !drop) { if (sb != null) sb.Append(c); continue; }
+                if (sb == null) sb = new StringBuilder(text.Substring(0, i));
+                if (swap != null) sb.Append(swap);
+                else if (i + 1 < text.Length && text[i + 1] == ' ' && (sb.Length == 0 || sb[sb.Length - 1] == ' ' || sb[sb.Length - 1] == '\n')) i++;
+            }
+            return sb == null ? text : sb.ToString().TrimEnd();
+        }
+
+        /// <summary>Canto superior esquerdo do elemento em coordenadas do palco (1280×720, y para baixo).</summary>
+        public static Vector2 StagePosition(RectTransform rt)
+        {
+            float x = 0f, y = 0f;
+            var current = rt;
+            while (current != null)
+            {
+                var parent = current.parent as RectTransform;
+                if (parent == null || parent == OverlayRoot || parent.name == "Screens" || parent.name == "Stage") { x += Left(current, Theme.Width); y += Top(current, Theme.Height); break; }
+                x += Left(current, parent.sizeDelta.x);
+                y += Top(current, parent.sizeDelta.y);
+                current = parent;
+            }
+            return new Vector2(x, y);
+        }
+
+        private static float Left(RectTransform rt, float parentWidth)
+        {
+            return rt.anchorMin.x * parentWidth + rt.anchoredPosition.x - rt.pivot.x * rt.sizeDelta.x;
+        }
+
+        private static float Top(RectTransform rt, float parentHeight)
+        {
+            return (1f - rt.anchorMin.y) * parentHeight - rt.anchoredPosition.y - (1f - rt.pivot.y) * rt.sizeDelta.y;
         }
 
         /// <summary>Erros de regra viram um aviso para o jogador; o resto segue para o relatório de erros.</summary>
@@ -193,33 +343,78 @@ namespace ComboTactics.UI
         }
     }
 
-    /// <summary>Barra horizontal (HP, stamina) preenchida da esquerda para a direita.</summary>
+    /// <summary>
+    /// Barra horizontal (HP, stamina) em canaleta de bronze: preenchimento com brilho, rastro claro da parte perdida
+    /// e marcas opcionais a cada quarto.
+    /// </summary>
     public sealed class UiBar
     {
         private readonly RectTransform _fill;
         private readonly Image _fillImage;
+        private readonly RectTransform _ghost;
+        private readonly BarGhostDriver _driver;
         private readonly float _width;
         private readonly float _height;
 
         public float Fraction { get; private set; }
+        public float GhostFraction { get; private set; }
 
-        public UiBar(Transform parent, float x, float y, float w, float h, Color fillColor)
+        public UiBar(Transform parent, float x, float y, float w, float h, Color fillColor, bool quarterTicks = false)
         {
             var back = Ui.Box(parent, "Bar", x, y, w, h, Theme.BarBack);
+            back.sprite = Art.BarSprite;
+            back.type = Image.Type.Sliced;
             var rim = back.gameObject.AddComponent<Outline>();
-            rim.effectColor = new Color(0.45f, 0.38f, 0.28f, 0.65f);
+            rim.effectColor = new Color(0.50f, 0.40f, 0.27f, 0.70f);
             rim.effectDistance = new Vector2(1f, -1f);
             _width = w - 4f;
             _height = h - 4f;
+
+            var ghost = Ui.Box(back.transform, "Ghost", 2f, 2f, _width, _height, Theme.Ghost);
+            ghost.sprite = Art.BarSprite;
+            ghost.type = Image.Type.Sliced;
+            _ghost = ghost.rectTransform;
+
             _fillImage = Ui.Box(back.transform, "Fill", 2f, 2f, _width, _height, fillColor);
+            _fillImage.sprite = Art.BarSprite;
+            _fillImage.type = Image.Type.Sliced;
             _fill = _fillImage.rectTransform;
+
+            var gloss = Ui.Picture(back.transform, "Gloss", Art.GradientUp, 2f, 2f, _width, Mathf.Max(2f, _height * 0.5f));
+            gloss.uvRect = new Rect(0f, 1f, 1f, -1f);
+            gloss.color = new Color(1f, 1f, 1f, 0.22f);
+
+            if (quarterTicks)
+                for (int i = 1; i < 4; i++)
+                    Ui.Box(back.transform, "Tick" + i, 2f + _width * i / 4f - 0.75f, 2f, 1.5f, _height, new Color(0f, 0f, 0f, 0.45f));
+
+            _driver = back.gameObject.AddComponent<BarGhostDriver>();
+            _driver.Setup(this);
             Fraction = 1f;
+            GhostFraction = 1f;
         }
 
         public void Set(float fraction)
         {
+            float next = Mathf.Clamp01(fraction);
+            if (next < Fraction - 0.0001f) _driver.Hit();
+            Fraction = next;
+            _fill.sizeDelta = new Vector2(_width * Fraction, _height);
+            if (GhostFraction < Fraction) SetGhost(Fraction);
+        }
+
+        /// <summary>Muda o valor sem rastro (troca de lutador, início de tela).</summary>
+        public void SetInstant(float fraction)
+        {
             Fraction = Mathf.Clamp01(fraction);
             _fill.sizeDelta = new Vector2(_width * Fraction, _height);
+            SetGhost(Fraction);
+        }
+
+        internal void SetGhost(float fraction)
+        {
+            GhostFraction = Mathf.Clamp01(fraction);
+            _ghost.sizeDelta = new Vector2(_width * GhostFraction, _height);
         }
 
         public void SetColor(Color color) { _fillImage.color = color; }
