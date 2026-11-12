@@ -705,8 +705,9 @@ namespace ComboTactics.UI
             foreach (var g in ghosts) UnityEngine.Object.Destroy(g.gameObject);
             UnityEngine.Object.Destroy(ring.gameObject);
             UnityEngine.Object.Destroy(tag.gameObject);
-            widget.ResetPose();
-            yield return Wait(0.12f);
+            widget.Flash(0f, Color.white);
+            // O atacante ficou no fim do avanço (o golpe não acertou): os dois voltam juntos à guarda.
+            yield return RecoverPoses(0.2f);
         }
 
         /// <summary>
@@ -762,7 +763,7 @@ namespace ComboTactics.UI
             var popup = Ui.Label(_overlay, "-" + damage.Amount, widget.CenterX - 150f, widget.CenterY - 130f, 300f, 64f, size, numberColor, TextAnchor.MiddleCenter, FontStyle.Bold, true);
             Text tagLabel = null;
             if (super || weak || damage.IsCounter)
-                tagLabel = Ui.Label(_overlay, damage.IsCounter ? "CONTRA-ATAQUE" : super ? "SUPER EFETIVO!" : "POUCO EFETIVO", widget.CenterX - 150f, widget.CenterY - 160f, 300f, 26f,
+                tagLabel = Ui.Label(_overlay, damage.IsCounter ? "CONTRA-ATAQUE" : super ? "SUPER EFETIVO!" : "POUCO EFETIVO", widget.CenterX - 150f, widget.CenterY - 182f, 300f, 26f,
                     Theme.FontSmall + 1, damage.IsCounter ? Theme.Gold : super ? Theme.Good : Theme.Muted, TextAnchor.MiddleCenter, FontStyle.Bold, true);
             var popupRect = popup.rectTransform;
             Vector2 popupHome = popupRect.anchoredPosition;
