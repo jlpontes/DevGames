@@ -18,7 +18,7 @@ namespace ComboTactics.UI
         public static float Speed = 1f;
 
         private static readonly float[] FighterX = { 370f, 910f };
-        private const float FighterY = 396f;
+        private const float FighterY = 378f;
 
         private readonly Match _match;
         private BattleEngine _engine;
@@ -28,16 +28,15 @@ namespace ComboTactics.UI
         private bool _confirmQuit;
 
         private ArenaStage _stage;
-        private Image _topBorder;
+        private ArenaMedallion _medallion;
         private Image _dockBorder;
+        private GameObject _turnMarker;
+        private readonly List<Coroutine> _fxRoutines = new List<Coroutine>();
         private SkillSpec _incomingSkill;
         private ReactionResult? _syncedReaction;
         private float _animTimeScale = 1f;
         private bool _syncingReaction;
         private bool _lastStandTriggered;
-        private Text _arenaName;
-        private Text _arenaEffect;
-        private Text _roundInfo;
         private Text _message;
         private Text _speedLabel;
         private Text _quitLabel;
@@ -61,30 +60,37 @@ namespace ComboTactics.UI
             _stage = ArenaStage.Create(Root, _view.Arena);
 
             for (int side = 0; side < 2; side++)
-            {
                 _fighters[side] = new FighterWidget(Root, FighterX[side], FighterY);
-                _teams[side] = new TeamPanel(Root, side == 0 ? 16 : 836, 10, _match.SideNames[side], _view.Sides[side].Team.Length);
-            }
+            for (int side = 0; side < 2; side++)
+                _teams[side] = new TeamPanel(Root, side == 0 ? 16 : 850, 10, _match.SideNames[side], _view.Sides[side].Team.Length, side == 1);
 
-            var top = Ui.Frame(Root, "ArenaInfo", 456, 10, 368, 104, Theme.Panel, Theme.BorderGold, 2f);
-            _topBorder = top.parent.GetComponent<Image>();
-            _arenaName = Ui.Label(top, "", 8, 2, 352, 26, 20, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold, true);
-            _arenaEffect = Ui.Label(top, "", 8, 26, 352, 20, 12, Theme.Text);
-            _roundInfo = Ui.Label(top, "", 8, 46, 352, 20, 13, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold);
+            int interval = _engine.Rules.ArenaDrawInterval;
+            _medallion = new ArenaMedallion(Root, 440, 10, 400, 86, interval > 0 && interval <= 5 ? interval : 0);
 
-            var speed = Ui.Button(top, "Velocidade: " + Speed + "×", 10, 68, 168, 28, ToggleSpeed, Theme.Button, 13);
+            var speed = Ui.Button(Root, SpeedText(), 540, 102, 96, 26, ToggleSpeed, Theme.Button, 12);
             _speedLabel = speed.GetComponentInChildren<Text>();
-            var quit = Ui.Button(top, "Desistir", 190, 68, 168, 28, Quit, Theme.Button, 13);
+            Ui.Tooltip(speed, "Velocidade das animações", "Acelera as animações da batalha. A janela de reação (QTE) não muda.");
+            var quit = Ui.Button(Root, "Desistir", 644, 102, 96, 26, Quit, Theme.Button, 12);
             _quitLabel = quit.GetComponentInChildren<Text>();
+            Ui.Tooltip(quit, "Desistir", "Sai da batalha sem ganhar moedas nem gastar itens. Clique duas vezes para confirmar.");
 
-            var dock = Ui.Frame(Root, "CombatDock", 16, 566, 1248, 144, Theme.Panel, Theme.BorderGold, 2f);
+            Ui.Shadow(Root, 16, 566, 1248, 146, 0.5f);
+            var dock = Ui.Frame(Root, "CombatDock", 16, 566, 1248, 146, Theme.Panel, Theme.BorderGold, 2f);
             _dockBorder = dock.parent.GetComponent<Image>();
-            var msgStrip = Ui.Box(dock, "MessageStrip", 4, 4, 1236, 32, new Color(0.05f, 0.04f, 0.04f, 0.72f));
-            Ui.Box(dock, "Divider", 4, 36, 1236, 1.5f, Theme.BorderSubtle);
-            _message = Ui.Label(msgStrip.transform, "", 14, 0, 1208, 32, 18, Theme.Text, TextAnchor.MiddleCenter, FontStyle.Bold, true);
+            var msgStrip = Ui.Box(dock, "MessageStrip", 6, 4, 1232, 30, new Color(0.02f, 0.02f, 0.03f, 0.55f));
+            var gem = Ui.Picture(msgStrip.transform, "Gem", Art.Diamond, 10, 9, 12, 12);
+            gem.color = Theme.Gold;
+            _message = Ui.Label(msgStrip.transform, "", 30, 0, 1180, 30, Theme.FontBody + 2, Theme.Text, TextAnchor.MiddleCenter, FontStyle.Bold, true);
+            _message.gameObject.AddComponent<TextReveal>();
 
-            _menu = Ui.Node(Root, "Menu", 16, 604, 1248, 106);
+            _menu = Ui.Node(Root, "Menu", 16, 602, 1248, 108);
             _overlay = Ui.Node(Root, "Overlay", 0, 0, Theme.Width, Theme.Height);
+            Root.gameObject.AddComponent<HudTicker>().Tick = t =>
+            {
+                _teams[0].Pulse(t);
+                _teams[1].Pulse(t);
+                _medallion.Spin(t);
+            };
 
             ShowActive(0);
             ShowActive(1);
@@ -101,6 +107,8 @@ namespace ComboTactics.UI
 
         public override void Close()
         {
+            foreach (var fx in _fxRoutines) if (fx != null) App.Host.StopCoroutine(fx);
+            _fxRoutines.Clear();
             if (_routine != null) App.Host.StopCoroutine(_routine);
             if (_inputRoutine != null) App.Host.StopCoroutine(_inputRoutine);
             _routine = null;
@@ -151,15 +159,17 @@ namespace ComboTactics.UI
         private void ToggleSpeed()
         {
             Speed = Speed > 1f ? 1f : 2f;
-            _speedLabel.text = "Velocidade: " + Speed + "×";
+            _speedLabel.text = SpeedText();
         }
+
+        private static string SpeedText() { return "Vel. " + Speed + "\u00D7"; }
 
         private void Quit()
         {
             if (!_confirmQuit)
             {
                 _confirmQuit = true;
-                _quitLabel.text = "Confirmar desistência?";
+                _quitLabel.text = "Confirmar?";
                 return;
             }
             // Desistir não paga moedas nem consome itens: o perfil só muda no fim de uma batalha (SYSTEM-DESIGN §3.5).
@@ -176,85 +186,217 @@ namespace ComboTactics.UI
 
         private void ShowPassDevice(int side, Action onReady)
         {
-            var cover = Ui.Box(_overlay, "PassDevice", 0, 0, Theme.Width, Theme.Height, Theme.PanelSolid);
+            var cover = Ui.Box(_overlay, "PassDevice", 0, 0, Theme.Width, Theme.Height, Theme.WithAlpha(Theme.Obsidian, 0.97f));
             cover.raycastTarget = true;
-            var card = Ui.Frame(cover.transform, "PassCard", 280, 170, 720, 380, Theme.Panel, Theme.BorderGold, 2.5f);
-            Ui.Label(card, "Passe o aparelho para", 20, 36, 680, 36, 26, Theme.Muted);
-            Ui.Label(card, _match.SideNames[side], 20, 82, 680, 80, 56, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold, true);
-            Ui.Label(card, "O outro jogador não pode ver a sua escolha de turno.", 20, 174, 680, 30, 18, Theme.Text);
-            Ui.Button(card, "Estou pronto", 210, 250, 300, 68, () =>
+            var rune = Ui.Picture(cover.transform, "Rune", Art.VfxRuneCircle, 440, 160, 400, 400);
+            rune.color = new Color(Theme.Gold.r, Theme.Gold.g, Theme.Gold.b, 0.10f);
+            var card = Ui.Frame(cover.transform, "PassCard", 300, 190, 680, 340, Theme.Panel, Theme.BorderGold, 2.5f);
+            Ui.Label(card, "PASSE O APARELHO PARA", 20, 34, 636, 30, Theme.FontHeading, Theme.Muted, TextAnchor.MiddleCenter, FontStyle.Bold);
+            Ui.Label(card, _match.SideNames[side], 20, 70, 636, 70, 52, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold, true);
+            Ui.Label(card, "O outro jogador não pode ver a sua escolha de turno.", 20, 150, 636, 26, Theme.FontBody + 1, Theme.Text);
+            var ready = Ui.Button(card, "Estou pronto", 188, 214, 300, 68, () =>
             {
                 UnityEngine.Object.Destroy(cover.gameObject);
                 onReady();
-            }, Theme.ButtonPrimary, 26);
+            }, Theme.ButtonPrimary, 24);
+            ready.gameObject.AddComponent<KeyShortcut>().Key = KeyCode.Space;
         }
 
         private void ShowActionMenu(int side, Action<ICommand> reply)
         {
-            Ui.Clear(_menu);
+            ClearMenu();
             var state = _engine.State.Sides[side];
             var active = state.Active;
-            Ui.Label(_menu, _match.SideNames[side] + " — Escolha a ação de " + active.Spec.Name, 16, 2, 900, 22, 15, Theme.Gold, TextAnchor.MiddleLeft, FontStyle.Bold);
+            MenuHeader("SUA VEZ  ·  " + _match.SideNames[side].ToUpperInvariant() + "  ·  ação de " + active.Spec.Name,
+                "1  2  3 golpes  ·  Q mochila  ·  E trocar");
+            ShowTurnMarker(side);
 
-            for (int i = 0; i < active.Spec.Skills.Count; i++)
+            Color element = Theme.ElementColor(active.Spec.Element);
+            for (int i = 0; i < active.Spec.Skills.Count && i < 3; i++)
             {
                 var skill = active.Spec.Skills[i];
                 var command = new AttackCommand(side, i);
-                int damage = _engine.PreviewDamage(side, i).Amount;
-                string hint = Theme.SkillHint(skill, _engine.Catalog);
-                string label = skill.Name + "\n~" + damage + " de dano" + (hint.Length > 0 ? " · " + hint : "");
-                if (skill.IsSpecial) label = "★ ESPECIAL: " + label;
-
+                var preview = _engine.PreviewDamage(side, i);
                 bool legal = _engine.IsLegal(command);
-                if (skill.IsSpecial && !legal) label = "★ ESPECIAL: " + skill.Name + "\nStamina " + state.Stamina + " / " + _engine.Rules.StaminaMax;
-                var button = Ui.Button(_menu, label, 14 + i * 254, 26, 244, 72, () => Choose(command, reply),
-                    skill.IsSpecial ? Theme.ButtonPrimary : Theme.Button, 14);
-                button.interactable = legal;
+                SkillCard(skill, i, preview, legal, element, state.Stamina, () => Choose(command, reply));
             }
 
-            bool hasItems = false;
-            foreach (var pair in state.Items) if (pair.Value > 0) hasItems = true;
-            var bag = Ui.Button(_menu, "Mochila", 784, 26, 216, 72, () => ShowItemMenu(side, reply), Theme.Button, 19);
-            bag.interactable = hasItems;
-            var swap = Ui.Button(_menu, "Trocar\nLutador", 1012, 26, 220, 72, () => ShowSwitchMenu(side, reply), Theme.Button, 17);
+            int itemCount = 0;
+            foreach (var pair in state.Items) if (pair.Value > 0) itemCount += pair.Value;
+            var bag = ActionCard(764, 228, "Mochila", itemCount > 0 ? itemCount + (itemCount == 1 ? " item" : " itens") + " · gasta o turno" : "vazia",
+                "Q", KeyCode.Q, () => ShowItemMenu(side, reply), Theme.Button);
+            bag.interactable = itemCount > 0;
+            Ui.Tooltip(bag, "Mochila", "Usar um item consome a ação deste turno.");
+
+            int bench = 0;
+            for (int i = 0; i < state.Team.Length; i++) if (i != state.ActiveIndex && !state.Team[i].IsFainted) bench++;
+            var swap = ActionCard(1004, 228, "Trocar lutador", bench > 0 ? bench + " no banco · troca antes dos golpes" : "ninguém no banco",
+                "E", KeyCode.E, () => ShowSwitchMenu(side, reply), Theme.Button);
             swap.interactable = state.HasBenchAlive;
+            Ui.Tooltip(swap, "Trocar lutador", "A troca acontece no início do turno, antes dos golpes. O novo lutador recebe o golpe do adversário.");
+        }
+
+        /// <summary>Carta de golpe: nome, dano estimado, efeito, efetividade contra o alvo e atalho de teclado.</summary>
+        private void SkillCard(SkillSpec skill, int index, DamageResult preview, bool legal, Color element, int stamina, Action onPick)
+        {
+            float x = 14 + index * 250, w = 240, h = 80;
+            bool special = skill.IsSpecial;
+            var button = Ui.Button(_menu, "", x, 24, w, h, onPick, special && legal ? Theme.ButtonPrimary : Theme.Button);
+            button.interactable = legal;
+            button.gameObject.name = "Skill" + index;
+            var t = button.transform;
+            float dim = legal ? 1f : 0.45f;
+
+            Ui.Box(t, "Accent", 5, 8, 3, h - 16, Theme.WithAlpha(special ? Theme.Gold : element, 0.9f * dim));
+            var key = Ui.Frame(t, "Key", 13, 8, 20, 20, Theme.PanelSolid, Theme.BorderGold, 1f);
+            Ui.Label(key, (index + 1).ToString(), 0, 0, 18, 18, 12, Theme.WithAlpha(Theme.Gold, dim), TextAnchor.MiddleCenter, FontStyle.Bold);
+            var nameLabel = Ui.Label(t, skill.Name, 40, 7, w - 46, 22, special && skill.Name.Length > 18 ? 14 : 16,
+                Theme.WithAlpha(special ? Theme.Gold : Theme.Text, dim), TextAnchor.MiddleLeft, FontStyle.Bold, special);
+            nameLabel.horizontalOverflow = HorizontalWrapMode.Overflow;
+            if (special)
+                Ui.Label(t, "ESPECIAL", w - 82, 55, 72, 18, Theme.FontCaption, legal ? Theme.Gold : Theme.WithAlpha(Theme.Muted, 0.8f), TextAnchor.MiddleRight, FontStyle.Bold, true);
+
+            string hint = Theme.SkillHint(skill, _engine.Catalog);
+            if (special && !legal)
+            {
+                Ui.Label(t, "Stamina " + stamina + " / " + _engine.Rules.StaminaMax, 14, 34, w - 24, 18, Theme.FontSmall, Theme.Muted, TextAnchor.MiddleLeft, FontStyle.Bold);
+                var gauge = new UiBar(t, 14, 59, w - 104, 10, Theme.Stamina, true);
+                gauge.SetInstant(stamina / (float)_engine.Rules.StaminaMax);
+            }
+            else
+            {
+                Ui.Label(t, "~" + preview.Amount + " de dano", 14, 33, 110, 20, Theme.FontSmall + 1, Theme.WithAlpha(Theme.Gold, dim), TextAnchor.MiddleLeft, FontStyle.Bold);
+                if (hint.Length > 0)
+                    Ui.Label(t, hint, 120, 33, w - 128, 20, Theme.FontCaption + 1, Theme.WithAlpha(Theme.Muted, dim), TextAnchor.MiddleRight);
+                string tag = EffectivenessTag(preview);
+                if (tag.Length > 0)
+                    Ui.Label(t, tag, 14, 55, w - (special ? 96 : 24), 18, Theme.FontCaption, Theme.WithAlpha(TagColor(preview), dim), TextAnchor.MiddleLeft, FontStyle.Bold);
+            }
+
+            if (index < 3) button.gameObject.AddComponent<KeyShortcut>().Key = KeyCode.Alpha1 + index;
+            string body = "Poder " + skill.Power + (special ? " · gasta toda a stamina" : "") +
+                          "\nDano estimado: " + preview.Amount + (EffectivenessTag(preview).Length > 0 ? " (" + EffectivenessTag(preview).ToLowerInvariant() + ")" : "") +
+                          (hint.Length > 0 ? "\nEfeito: " + hint : "") +
+                          (special && !legal ? "\nPrecisa da stamina cheia (" + _engine.Rules.StaminaMax + ")." : "");
+            Ui.Tooltip(button, skill.Name, body);
+        }
+
+        private static string EffectivenessTag(DamageResult preview)
+        {
+            string tag = preview.Effectiveness == Effectiveness.SuperEffective ? "▲ SUPER EFETIVO"
+                : preview.Effectiveness == Effectiveness.NotEffective ? "▼ POUCO EFETIVO" : "";
+            if (preview.ArenaMultiplier > 1.001) tag += (tag.Length > 0 ? "  ·  " : "") + "ARENA +10%";
+            else if (preview.ArenaMultiplier < 0.999) tag += (tag.Length > 0 ? "  ·  " : "") + "ARENA −10%";
+            return tag;
+        }
+
+        private static Color TagColor(DamageResult preview)
+        {
+            if (preview.Effectiveness == Effectiveness.SuperEffective) return Theme.Good;
+            if (preview.Effectiveness == Effectiveness.NotEffective) return Theme.Bad;
+            return preview.ArenaMultiplier >= 1.0 ? Theme.Good : Theme.Bad;
+        }
+
+        /// <summary>Carta secundária (mochila, troca, item, voltar): título, linha de apoio e atalho.</summary>
+        private Button ActionCard(float x, float w, string title, string subtitle, string keyLabel, KeyCode key, Action onPick, Color color)
+        {
+            var button = Ui.Button(_menu, "", x, 24, w, 80, onPick, color);
+            var t = button.transform;
+            if (!string.IsNullOrEmpty(keyLabel))
+            {
+                var badge = Ui.Frame(t, "Key", 13, 8, 20, 20, Theme.PanelSolid, Theme.BorderGold, 1f);
+                Ui.Label(badge, keyLabel, 0, 0, 18, 18, 12, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold);
+                button.gameObject.AddComponent<KeyShortcut>().Key = key;
+            }
+            var titleLabel = Ui.Label(t, title, 40, 7, w - 48, 24, 17, Theme.Text, TextAnchor.MiddleLeft, FontStyle.Bold, true);
+            var sub = Ui.Label(t, subtitle, 14, 36, w - 24, 38, Theme.FontSmall, Theme.Muted, TextAnchor.UpperLeft);
+            button.gameObject.AddComponent<CardDimmer>().Setup(button, titleLabel, sub);
+            return button;
+        }
+
+        private void MenuHeader(string title, string hint)
+        {
+            var gem = Ui.Picture(_menu, "HeaderGem", Art.Diamond, 16, 5, 12, 12);
+            gem.color = Theme.Gold;
+            Ui.Label(_menu, title, 34, 0, 860, 22, Theme.FontBody, Theme.Gold, TextAnchor.MiddleLeft, FontStyle.Bold);
+            if (!string.IsNullOrEmpty(hint)) Ui.Label(_menu, hint, 860, 0, 372, 22, Theme.FontCaption, Theme.Muted, TextAnchor.MiddleRight, FontStyle.Bold);
         }
 
         private void ShowItemMenu(int side, Action<ICommand> reply)
         {
-            Ui.Clear(_menu);
+            ClearMenu();
             var state = _engine.State.Sides[side];
-            Ui.Label(_menu, "Mochila — Usar um item consome o turno", 16, 2, 900, 22, 15, Theme.Gold, TextAnchor.MiddleLeft, FontStyle.Bold);
+            MenuHeader("MOCHILA  ·  usar um item consome o turno", "Esc volta");
+            ShowTurnMarker(side);
             int column = 0;
             foreach (var pair in state.Items)
             {
-                if (pair.Value <= 0) continue;
+                if (pair.Value <= 0 || column >= 3) continue;
                 var item = _engine.Catalog.Items[pair.Key];
                 var command = new UseItemCommand(side, item.Id);
-                var button = Ui.Button(_menu, item.Name + "  ×" + pair.Value + "\n" + item.Description, 14 + column * 254, 26, 244, 72,
-                    () => Choose(command, reply), Theme.Button, 14);
-                button.interactable = _engine.IsLegal(command);
+                var card = ActionCard(14 + column * 250, 240, item.Name + "  ×" + pair.Value, item.Description,
+                    (column + 1).ToString(), KeyCode.Alpha1 + column, () => Choose(command, reply), Theme.Button);
+                card.interactable = _engine.IsLegal(command);
+                Ui.Tooltip(card, item.Name, item.Description);
                 column++;
             }
-            Ui.Button(_menu, "Voltar", 1012, 26, 220, 72, () => ShowActionMenu(side, reply), Theme.Button, 19);
+            ActionCard(1004, 228, "Voltar", "ao menu de ações", "Esc", KeyCode.Escape, () => ShowActionMenu(side, reply), Theme.Button);
         }
 
         private void ShowSwitchMenu(int side, Action<ICommand> reply)
         {
-            Ui.Clear(_menu);
+            ClearMenu();
             var state = _engine.State.Sides[side];
-            Ui.Label(_menu, "Trocar Lutador — A troca ocorre no início do turno", 16, 2, 900, 22, 15, Theme.Gold, TextAnchor.MiddleLeft, FontStyle.Bold);
+            MenuHeader("TROCAR LUTADOR  ·  a troca acontece no início do turno", "Esc volta");
+            ShowTurnMarker(side);
             int column = 0;
             for (int i = 0; i < state.Team.Length; i++)
             {
                 if (i == state.ActiveIndex) continue;
                 var command = new SwitchCommand(side, i);
-                var button = Ui.Button(_menu, BenchLabel(state.Team[i]), 14 + column * 336, 26, 324, 72, () => Choose(command, reply),
-                    Theme.ElementColor(state.Team[i].Spec.Element) * 0.72f, 15);
-                button.interactable = _engine.IsLegal(command);
+                var card = BenchCard(_menu, 14 + column * 372, 24, 360, 80, state.Team[i], () => Choose(command, reply));
+                card.interactable = _engine.IsLegal(command);
+                card.gameObject.AddComponent<KeyShortcut>().Key = KeyCode.Alpha1 + column;
                 column++;
             }
-            Ui.Button(_menu, "Voltar", 1012, 26, 220, 72, () => ShowActionMenu(side, reply), Theme.Button, 19);
+            ActionCard(1004, 228, "Voltar", "ao menu de ações", "Esc", KeyCode.Escape, () => ShowActionMenu(side, reply), Theme.Button);
+        }
+
+        /// <summary>Carta de lutador do banco: retrato, nome, elemento e classe, HP e efeitos.</summary>
+        private Button BenchCard(Transform parent, float x, float y, float w, float h, Fighter fighter, Action onPick)
+        {
+            var spec = fighter.Spec;
+            Color element = Theme.ElementColor(spec.Element);
+            var button = Ui.Button(parent, "", x, y, w, h, onPick, Theme.Button);
+            var t = button.transform;
+            var portrait = Ui.Frame(t, "Portrait", 8, 8, h - 16, h - 16, Theme.ElementDark(spec.Element), element, 1.5f);
+            var icon = Ui.Picture(portrait, "Icon", Art.Fighter(spec.Id, spec.Element, spec.Class), 2, 2, h - 23, h - 23);
+            if (fighter.IsFainted) icon.color = new Color(0.4f, 0.4f, 0.42f, 0.6f);
+            float tx = h + 2;
+            Ui.Label(t, spec.Name, tx, 6, w - tx - 10, 22, 16, fighter.IsFainted ? Theme.Muted : Theme.Text, TextAnchor.MiddleLeft, FontStyle.Bold, true);
+            Ui.Label(t, Theme.ElementName(spec.Element).ToUpperInvariant() + " · " + Theme.ClassName(spec.Class).ToUpperInvariant(),
+                tx, 28, w - tx - 10, 16, Theme.FontCaption, Theme.ElementLight(spec.Element), TextAnchor.MiddleLeft, FontStyle.Bold);
+            if (fighter.IsFainted)
+            {
+                Ui.Label(t, "CAÍDO", tx, 48, w - tx - 10, 20, Theme.FontSmall, Theme.Bad, TextAnchor.MiddleLeft, FontStyle.Bold);
+            }
+            else
+            {
+                float fraction = fighter.Hp / (float)spec.MaxHp;
+                var bar = new UiBar(t, tx, 50, w - tx - 84, 12, Theme.HpColor(fraction));
+                bar.SetInstant(fraction);
+                Ui.Label(t, fighter.Hp + " / " + spec.MaxHp, w - 80, 46, 70, 20, Theme.FontCaption + 1, Theme.Text, TextAnchor.MiddleRight, FontStyle.Bold);
+            }
+            Ui.Tooltip(button, spec.Name, "Ataque " + spec.Attack + " · Defesa " + spec.Defense + " · Velocidade " + spec.Speed +
+                (fighter.Effects.Count > 0 ? "\nEfeitos: " + EffectList(fighter) : ""));
+            return button;
+        }
+
+        private static string EffectList(Fighter fighter)
+        {
+            var parts = new List<string>();
+            foreach (var effect in fighter.Effects) parts.Add(effect.Spec.Name + " (" + effect.TurnsLeft + ")");
+            return string.Join(" · ", parts.ToArray());
         }
 
         private static string BenchLabel(Fighter fighter)
@@ -264,9 +406,27 @@ namespace ComboTactics.UI
                    Theme.ElementName(fighter.Spec.Element) + " · " + Theme.ClassName(fighter.Spec.Class);
         }
 
-        private void Choose(ICommand command, Action<ICommand> reply)
+        private void ShowTurnMarker(int side)
+        {
+            if (_turnMarker != null) UnityEngine.Object.Destroy(_turnMarker);
+            var widget = _fighters[side];
+            var marker = Ui.Picture(Root, "TurnMarker", Art.Diamond, 0, 0, 22, 26);
+            Ui.PlaceCentered(marker.rectTransform, widget.CenterX, widget.CenterY - 132f, 22f, 26f);
+            marker.color = Theme.Gold;
+            marker.gameObject.AddComponent<TurnMarker>().Setup(marker);
+            _turnMarker = marker.gameObject;
+        }
+
+        private void ClearMenu()
         {
             Ui.Clear(_menu);
+            if (_turnMarker != null) UnityEngine.Object.Destroy(_turnMarker);
+            _turnMarker = null;
+        }
+
+        private void Choose(ICommand command, Action<ICommand> reply)
+        {
+            ClearMenu();
             _confirmQuit = false;
             _quitLabel.text = "Desistir";
             reply(command);
@@ -275,10 +435,11 @@ namespace ComboTactics.UI
         public void AskForcedSwitch(int side, Action<int> reply)
         {
             var state = _engine.State.Sides[side];
-            var dim = Ui.Box(_overlay, "ForcedSwitch", 0, 0, Theme.Width, Theme.Height, new Color(0f, 0f, 0f, 0.60f));
+            var dim = Ui.Box(_overlay, "ForcedSwitch", 0, 0, Theme.Width, Theme.Height, new Color(0f, 0f, 0f, 0.62f));
             dim.raycastTarget = true;
-            var panel = Ui.Frame(dim.transform, "Panel", 290, 220, 700, 260, Theme.Panel, Theme.BorderGold, 2.5f);
-            Ui.Label(panel, _match.SideNames[side] + " — Escolha quem entra na arena", 10, 16, 680, 40, 26, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold, true);
+            var panel = Ui.Frame(dim.transform, "Panel", 270, 200, 740, 250, Theme.PanelSolid, Theme.BorderGold, 2.5f);
+            Ui.Label(panel, _match.SideNames[side].ToUpperInvariant() + "  ·  QUEM ENTRA NA ARENA?", 10, 16, 716, 36, 24, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold, true);
+            Ui.Label(panel, "O lutador caiu. Escolha quem assume o combate.", 10, 52, 716, 22, Theme.FontBody, Theme.Muted);
 
             var options = new List<int>();
             for (int i = 0; i < state.Team.Length; i++)
@@ -286,13 +447,13 @@ namespace ComboTactics.UI
             for (int n = 0; n < options.Count; n++)
             {
                 int index = options[n];
-                float width = options.Count == 1 ? 400f : 320f;
-                float x = options.Count == 1 ? 150f : 20f + n * 340f;
-                Ui.Button(panel, BenchLabel(state.Team[index]), x, 90, width, 110, () =>
+                float x = options.Count == 1 ? 188f : 16f + n * 358f;
+                var card = BenchCard(panel, x, 100, 346, 96, state.Team[index], () =>
                 {
                     UnityEngine.Object.Destroy(dim.gameObject);
                     reply(index);
-                }, Theme.ElementColor(state.Team[index].Spec.Element) * 0.72f, 18);
+                });
+                card.gameObject.AddComponent<KeyShortcut>().Key = KeyCode.Alpha1 + n;
             }
         }
 
@@ -358,8 +519,13 @@ namespace ComboTactics.UI
             Color subColor = !isSpecial && qte.SpeedBonusPercent >= 15 ? Theme.Good : Theme.Text;
             Ui.Label(root, subText, 0, 680, Theme.Width, 24, 14, subColor, TextAnchor.MiddleCenter, FontStyle.Bold, true);
 
-            var barFrame = Ui.Box(root, "BarFrame", barX - 3f, barY - 3f, barWidth + 6f, barHeight + 6f, frameColor);
-            var bar = Ui.Box(barFrame.transform, "Bar", 3f, 3f, barWidth, barHeight, new Color(0.04f, 0.05f, 0.08f, 0.96f));
+            var barFrame = Ui.Box(root, "BarFrame", barX - 4f, barY - 4f, barWidth + 8f, barHeight + 8f, frameColor);
+            barFrame.sprite = Art.FrameSprite;
+            barFrame.type = Image.Type.Sliced;
+            barFrame.pixelsPerUnitMultiplier = 1.25f;
+            var bar = Ui.Box(barFrame.transform, "Bar", 4f, 4f, barWidth, barHeight, new Color(0.04f, 0.05f, 0.08f, 0.97f));
+            bar.sprite = Art.BarSprite;
+            bar.type = Image.Type.Sliced;
 
             Color goodBaseColor = new Color(0.20f, 0.64f, 0.98f, 0.92f);
             Color perfBaseColor = Theme.Gold;
@@ -370,6 +536,10 @@ namespace ComboTactics.UI
             trail.color = new Color(1f, 0.92f, 0.65f, 0f);
             var markerGlow = Ui.Picture(bar.transform, "MarkerGlow", Art.VfxOrb, 0, 0, 34f, barHeight + 22f);
             markerGlow.color = new Color(1f, 0.95f, 0.78f, 0.75f);
+            goodBox.sprite = Art.BarSprite;
+            goodBox.type = Image.Type.Sliced;
+            perfBox.sprite = Art.BarSprite;
+            perfBox.type = Image.Type.Sliced;
             var marker = Ui.Box(bar.transform, "Marker", 0, -6f, 6f, barHeight + 12f, Color.white);
             Ui.PlaceCentered(marker.rectTransform, 0f, barHeight * 0.5f, 6f, barHeight + 12f);
             Ui.PlaceCentered(markerGlow.rectTransform, 0f, barHeight * 0.5f, 34f, barHeight + 22f);

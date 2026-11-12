@@ -352,6 +352,7 @@ namespace ComboTactics.UI
         private readonly RectTransform _fill;
         private readonly Image _fillImage;
         private readonly RectTransform _ghost;
+        private readonly Image _ghostImage;
         private readonly BarGhostDriver _driver;
         private readonly float _width;
         private readonly float _height;
@@ -374,6 +375,7 @@ namespace ComboTactics.UI
             ghost.sprite = Art.BarSprite;
             ghost.type = Image.Type.Sliced;
             _ghost = ghost.rectTransform;
+            _ghostImage = ghost;
 
             _fillImage = Ui.Box(back.transform, "Fill", 2f, 2f, _width, _height, fillColor);
             _fillImage.sprite = Art.BarSprite;
@@ -400,6 +402,7 @@ namespace ComboTactics.UI
             if (next < Fraction - 0.0001f) _driver.Hit();
             Fraction = next;
             _fill.sizeDelta = new Vector2(_width * Fraction, _height);
+            _fillImage.enabled = _width * Fraction >= 1f;
             if (GhostFraction < Fraction) SetGhost(Fraction);
         }
 
@@ -408,6 +411,7 @@ namespace ComboTactics.UI
         {
             Fraction = Mathf.Clamp01(fraction);
             _fill.sizeDelta = new Vector2(_width * Fraction, _height);
+            _fillImage.enabled = _width * Fraction >= 1f;
             SetGhost(Fraction);
         }
 
@@ -415,6 +419,7 @@ namespace ComboTactics.UI
         {
             GhostFraction = Mathf.Clamp01(fraction);
             _ghost.sizeDelta = new Vector2(_width * GhostFraction, _height);
+            _ghostImage.enabled = _width * GhostFraction >= 1f;
         }
 
         public void SetColor(Color color) { _fillImage.color = color; }

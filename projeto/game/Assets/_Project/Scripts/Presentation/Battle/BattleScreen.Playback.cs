@@ -37,8 +37,8 @@ namespace ComboTactics.UI
                     : damage.Effectiveness == Effectiveness.NotEffective ? "Pouco efetivo... " : "";
                 Say(prefix + Who(damage.TargetSide, damage.FighterIndex) + " sofreu " + damage.Amount + " de dano" +
                     (damage.IsCounter ? " no contra-ataque." : "."));
-                yield return PlayHpChange(ev, damage.TargetSide, damage.FighterIndex, damage.HpAfter, "-" + damage.Amount, Theme.Bad, true);
-                ResetPoses();
+                yield return PlayImpact(damage);
+                yield return RecoverPoses(0.22f);
                 yield break;
             }
 
@@ -66,7 +66,7 @@ namespace ComboTactics.UI
             {
                 Apply(ev);
                 Say(Who(applied.Side, applied.FighterIndex) + ": " + applied.Effect.Name + " por " + applied.Turns + " turnos.");
-                yield return Wait(0.45f);
+                yield return PlayEffectMark(applied.Side, applied.FighterIndex, applied.Effect);
                 yield break;
             }
 
@@ -110,15 +110,7 @@ namespace ComboTactics.UI
                 bool wasActive = fainted.FighterIndex == _view.Sides[fainted.Side].ActiveIndex;
                 Say(Who(fainted.Side, fainted.FighterIndex) + " foi derrotado!");
                 Apply(ev);
-                if (wasActive)
-                {
-                    var widget = _fighters[fainted.Side];
-                    yield return Tween(0.4f, t =>
-                    {
-                        widget.SetAlpha(Mathf.Lerp(1f, 0.25f, t));
-                        widget.SetOffset(new Vector2(0f, -30f * t));
-                    });
-                }
+                if (wasActive) yield return PlayFaint(fainted.Side);
                 if (_match.Mode == GameMode.Campaign && fainted.Side == 1 && !_lastStandTriggered)
                 {
                     int alive = 0;
@@ -148,6 +140,9 @@ namespace ComboTactics.UI
                 yield break;
             }
 
+            var round = ev as RoundStarted;
+            if (round != null && round.Round > 1) StartFx(RoundBanner(round.Round));
+
             // RoundStarted, ReactionRequested, EffectExpired: só atualizam o HUD.
             Apply(ev);
         }
@@ -166,37 +161,14 @@ namespace ComboTactics.UI
 
             if (e.Skill.IsSpecial)
             {
-                string specialMsg = "★ GOLPE ESPECIAL! " + Who(e.Side, e.FighterIndex) + " invoca " + e.Skill.Name + "!";
+                string specialMsg = "GOLPE ESPECIAL! " + Who(e.Side, e.FighterIndex) + " invoca " + e.Skill.Name + "!";
                 if (_match.Mode == GameMode.Campaign && e.Side == 1)
                 {
                     string quote = CampaignStory.Chapter(_match.StageIndex).SpecialQuote;
                     if (!string.IsNullOrEmpty(quote)) specialMsg = quote;
                 }
                 Say(specialMsg);
-                _stage.Shake(8.5f, 0.56f);
-                var flash = Ui.Box(_overlay, "SpecialFlash", 0, 0, Theme.Width, Theme.Height, new Color(0.02f, 0.01f, 0.04f, 0f));
-                var cutIn = Ui.Frame(_overlay, "SpecialCutIn", 220, 178, 840, 96, new Color(0.06f, 0.04f, 0.08f, 0.94f), elemColor, 2.5f);
-                Ui.Picture(cutIn, "Portrait", Art.Fighter(fighterSpec.Id, fighterSpec.Element, fighterSpec.Class), 12, 6, 80, 80);
-                Ui.Label(cutIn, "★ ATAQUE ESPECIAL — " + fighterSpec.Name.ToUpper(), 106, 10, 714, 30, 18, Theme.Gold, TextAnchor.MiddleLeft, FontStyle.Bold, true);
-                Ui.Label(cutIn, e.Skill.Name.ToUpper(), 106, 40, 714, 44, 34, elemColor, TextAnchor.MiddleLeft, FontStyle.Bold, true);
-
-                var pillar = SpawnVfx(Art.VfxPillar, attacker.CenterX, attacker.CenterY, 180f, 340f, elemColor);
-                var aura = SpawnVfx(Art.VfxRing, attacker.CenterX, attacker.CenterY, 80f, 80f, elemColor);
-                var outerRing = SpawnVfx(Art.VfxRing, attacker.CenterX, attacker.CenterY, 140f, 140f, Theme.Gold);
-                yield return Tween(0.62f, t =>
-                {
-                    float pulse = Mathf.Sin(t * Mathf.PI);
-                    attacker.SetScale(1f + 0.32f * pulse);
-                    flash.color = new Color(elemColor.r * 0.35f, elemColor.g * 0.35f, elemColor.b * 0.35f, 0.48f * pulse);
-                    PlaceVfx(pillar, attacker.CenterX, attacker.CenterY - 20f * t, 190f, 360f * pulse, pulse * 0.85f);
-                    PlaceVfx(aura, attacker.CenterX, attacker.CenterY, Mathf.Lerp(100f, 360f, t), Mathf.Lerp(100f, 360f, t), 1f - t);
-                    PlaceVfx(outerRing, attacker.CenterX, attacker.CenterY, Mathf.Lerp(160f, 440f, t), Mathf.Lerp(160f, 440f, t), (1f - t) * 0.8f);
-                });
-                UnityEngine.Object.Destroy(outerRing.gameObject);
-                UnityEngine.Object.Destroy(aura.gameObject);
-                UnityEngine.Object.Destroy(pillar.gameObject);
-                UnityEngine.Object.Destroy(cutIn.parent.gameObject);
-                UnityEngine.Object.Destroy(flash.gameObject);
+                yield return PlaySpecialCutIn(attacker, fighterSpec, e.Skill, direction, elemColor);
             }
             else
             {
@@ -215,9 +187,23 @@ namespace ComboTactics.UI
                 _syncedReaction = null;
                 _syncingReaction = true;
                 float timeToImpact = QteConfig.LeadInSeconds + qte.TargetNormalized * qte.SweepSeconds;
-                _animTimeScale = 0.28f / Mathf.Max(0.18f, timeToImpact);
+                // Antecipação (0,10) + avanço (~0,28) chegam ao alvo junto com o marcador da barra.
+                _animTimeScale = 0.38f / Mathf.Max(0.18f, timeToImpact);
                 _inputRoutine = App.Host.StartCoroutine(Coroutines.Guard(ReactionWindow(defenderSide, qte, r => _syncedReaction = r), OnError));
             }
+
+            // Antecipação: o corpo recua e se encolhe antes de soltar o golpe (lê a intenção antes do impacto).
+            bool caster = fighterSpec.Class == CharClass.Mage || fighterSpec.Class == CharClass.Neutral;
+            yield return Tween(0.10f, t =>
+            {
+                float k = Ease.OutQuad(t);
+                attacker.SetOffset(new Vector2(-direction * 12f * k, caster ? 6f * k : -4f * k));
+                attacker.SetSquash(1f + 0.06f * k, 1f - 0.07f * k);
+                attacker.SetRotation(6f * k);
+                attacker.SetAuraBoost(0.18f * k);
+            });
+            attacker.SetSquash(1f, 1f);
+            attacker.SetRotation(0f);
 
             if (id == "fire_mage_skill3") yield return AnimateMeteorShower(attacker, defender, elemColor);
             else if (id == "water_mage_skill3") yield return AnimateBlizzard(attacker, defender, elemColor);
@@ -235,6 +221,7 @@ namespace ComboTactics.UI
             else if (e.Skill.EffectTarget == EffectTarget.Self && !e.Skill.IsSpecial) yield return AnimateBuffAndStrike(attacker, defender, direction, elemColor);
             else if (fighterSpec.Class == CharClass.Tank) yield return AnimateHeavySlam(attacker, defender, direction, elemColor);
             else yield return AnimateMeleeSlash(attacker, defender, direction, elemColor, id == "plant_warrior_skill1");
+            attacker.SetAuraBoost(0f);
 
             if (syncWithHumanBar)
             {
@@ -242,6 +229,58 @@ namespace ComboTactics.UI
                 _syncingReaction = false;
                 _animTimeScale = 1f;
             }
+        }
+
+        /// <summary>
+        /// Cut-in do golpe especial: faixa diagonal na cor do elemento atravessa a tela com linhas de velocidade,
+        /// o retrato entra pelo lado de quem ataca e o nome do golpe aparece grande. Dura ~0,7 s.
+        /// </summary>
+        private IEnumerator PlaySpecialCutIn(FighterWidget attacker, FighterSpec spec, SkillSpec skill, float direction, Color elemColor)
+        {
+            _stage.Shake(4f, 0.4f);
+            var dim = Ui.Box(_overlay, "SpecialDim", 0, 0, Theme.Width, Theme.Height, new Color(0f, 0f, 0f, 0f));
+            var band = Ui.Node(_overlay, "SpecialBand", 0, 0, Theme.Width + 200f, 150f);
+            Ui.PlaceCentered(band, Theme.Width * 0.5f, 250f, Theme.Width + 200f, 150f);
+            band.localRotation = Quaternion.Euler(0f, 0f, -4f * direction);
+            var fill = Ui.Box(band, "Fill", 0, 0, Theme.Width + 200f, 150f, Theme.ElementDark(spec.Element, 0.93f));
+            Ui.Box(band, "EdgeTop", 0, 0, Theme.Width + 200f, 3f, elemColor);
+            Ui.Box(band, "EdgeBottom", 0, 147f, Theme.Width + 200f, 3f, elemColor);
+            var streaks = Ui.Picture(band, "Streaks", Art.VfxStreaks, 0, 0, Theme.Width + 200f, 150f);
+            streaks.color = Theme.WithAlpha(Theme.ElementLight(spec.Element), 0.35f);
+            var portrait = Ui.Picture(band, "Portrait", Art.Fighter(spec.Id, spec.Element, spec.Class), 0, 0, 230f, 230f);
+            if (direction < 0f) portrait.uvRect = new Rect(1f, 0f, -1f, 1f);
+            var caption = Ui.Label(band, "GOLPE ESPECIAL  ·  " + spec.Name.ToUpperInvariant(), 0, 18, 760, 26, Theme.FontHeading, Theme.Gold, direction > 0 ? TextAnchor.MiddleLeft : TextAnchor.MiddleRight, FontStyle.Bold, true);
+            var title = Ui.Label(band, skill.Name.ToUpperInvariant(), 0, 46, 760, 60, 46, Color.white, direction > 0 ? TextAnchor.MiddleLeft : TextAnchor.MiddleRight, FontStyle.Bold, true);
+            var titleRect = title.rectTransform;
+            var captionRect = caption.rectTransform;
+
+            var aura = SpawnVfx(Art.VfxRuneCircle, attacker.CenterX, attacker.CenterY + 70f, 120f, 40f, elemColor);
+            float bandCenter = (Theme.Width + 200f) * 0.5f;
+            yield return Tween(0.68f, t =>
+            {
+                float enter = Ease.OutCubic(t / 0.22f);
+                float leave = Ease.InCubic((t - 0.80f) / 0.20f);
+                float presence = enter * (1f - leave);
+                dim.color = new Color(0f, 0f, 0f, 0.45f * presence);
+                band.localScale = new Vector3(1f, Mathf.Max(0.01f, presence), 1f);
+                fill.color = Theme.ElementDark(spec.Element, 0.93f * presence);
+                streaks.uvRect = new Rect(-t * 1.6f * direction, 0f, 1f, 1f);
+
+                float slide = (1f - enter) * 420f - leave * 260f;
+                float px = direction > 0 ? 120f - slide : bandCenter * 2f - 350f + slide;
+                Ui.Place(portrait.rectTransform, px, -48f, 230f, 230f);
+                float tx = direction > 0 ? 360f + (1f - enter) * 160f : bandCenter * 2f - 1120f - (1f - enter) * 160f;
+                Ui.Place(titleRect, tx, 46f, 760f, 60f);
+                Ui.Place(captionRect, tx, 18f, 760f, 26f);
+
+                attacker.SetScale(1f + 0.10f * Mathf.Sin(t * Mathf.PI));
+                attacker.SetAuraBoost(0.45f * Mathf.Sin(t * Mathf.PI));
+                PlaceVfx(aura, attacker.CenterX, attacker.CenterY + 92f, Mathf.Lerp(120f, 380f, t), Mathf.Lerp(40f, 110f, t), 1f - t);
+            });
+            UnityEngine.Object.Destroy(aura.gameObject);
+            UnityEngine.Object.Destroy(band.gameObject);
+            UnityEngine.Object.Destroy(dim.gameObject);
+            attacker.SetScale(1f);
         }
 
         private IEnumerator AnimateMeleeSlash(FighterWidget attacker, FighterWidget defender, float direction, Color elemColor, bool doubleSlash)
@@ -630,24 +669,144 @@ namespace ComboTactics.UI
 
             var side = _view.Sides[e.DefenderSide];
             var widget = _fighters[e.DefenderSide];
-            float away = e.DefenderSide == 0 ? -1f : 1f;
-            Say(Who(e.DefenderSide, side.ActiveIndex) + (e.Result == ReactionResult.Counter ? " desviou e vai contra-atacar!" : " desviou do golpe!"));
+            var spec = side.Team[side.ActiveIndex].Spec;
+            float away = -widget.Facing;
+            bool counter = e.Result == ReactionResult.Counter;
+            Say(Who(e.DefenderSide, side.ActiveIndex) + (counter ? " desviou e vai contra-atacar!" : " desviou do golpe!"));
 
-            Color vfxColor = e.Result == ReactionResult.Counter ? Theme.Gold : new Color(0.35f, 0.78f, 1f, 1f);
-            var ring = SpawnVfx(e.Result == ReactionResult.Counter ? Art.VfxShield : Art.VfxRing, widget.CenterX, widget.CenterY, 140f, 140f, vfxColor);
-            yield return Tween(0.26f, t =>
+            Color vfxColor = counter ? Theme.Gold : new Color(0.45f, 0.80f, 1f, 1f);
+            var ring = SpawnVfx(counter ? Art.VfxShield : Art.VfxRing, widget.CenterX, widget.CenterY, 140f, 140f, vfxColor);
+            var tag = FloatingTag(widget, counter ? "CONTRA-ATAQUE" : "DESVIO", vfxColor);
+            // Imagens residuais: dois "fantasmas" do lutador ficam no lugar de onde ele saltou.
+            var ghosts = new RawImage[2];
+            for (int i = 0; i < ghosts.Length; i++)
+            {
+                ghosts[i] = SpawnVfx(widget.Texture as Texture2D, widget.CenterX, widget.CenterY, 210f, 210f, Theme.WithAlpha(Theme.ElementLight(spec.Element), 0f));
+                ghosts[i].material = Art.SilhouetteMaterial;
+                if (widget.Facing < 0f) ghosts[i].uvRect = new Rect(1f, 0f, -1f, 1f);
+            }
+            if (counter) { widget.Flash(0.9f, Theme.Gold); _stage.Punch(0.012f); }
+
+            yield return Tween(0.30f, t =>
             {
                 float arc = Mathf.Sin(t * Mathf.PI);
-                widget.SetOffset(new Vector2(away * 65f * arc, 42f * arc));
-                widget.SetRotation(away * 12f * arc);
-                PlaceVfx(ring, widget.CenterX, widget.CenterY, Mathf.Lerp(120f, 230f, t), Mathf.Lerp(120f, 230f, t), 1f - t);
+                widget.SetOffset(new Vector2(away * 70f * arc, 40f * arc));
+                widget.SetRotation(-12f * arc);
+                widget.SetSquash(1f - 0.06f * arc, 1f + 0.08f * arc);
+                widget.Flash(counter ? 0.9f * (1f - t) : 0f, Theme.Gold);
+                for (int i = 0; i < ghosts.Length; i++)
+                {
+                    float lag = Mathf.Max(0f, Mathf.Sin(Mathf.Clamp01(t - 0.08f * (i + 1)) * Mathf.PI));
+                    PlaceVfx(ghosts[i], widget.CenterX + away * 70f * lag * 0.6f, widget.CenterY - 40f * lag * 0.5f, 210f, 210f, 0.35f * (1f - t) * (i == 0 ? 1f : 0.6f));
+                }
+                PlaceVfx(ring, widget.CenterX, widget.CenterY, Mathf.Lerp(120f, 240f, t), Mathf.Lerp(120f, 240f, t), 1f - t);
+                MoveTag(tag, widget, t);
             });
+            foreach (var g in ghosts) UnityEngine.Object.Destroy(g.gameObject);
             UnityEngine.Object.Destroy(ring.gameObject);
-            ResetPoses();
-            yield return Wait(0.20f);
+            UnityEngine.Object.Destroy(tag.gameObject);
+            widget.ResetPose();
+            yield return Wait(0.12f);
         }
 
-        /// <summary>Dano ou cura: número flutuante, barra de HP animada e, no dano, flash vermelho com tremor e impacto.</summary>
+        /// <summary>
+        /// O impacto de um golpe: hit-stop, flash branco na silhueta, faíscas, recuo com achatamento, tremor e zoom
+        /// proporcionais ao dano, número de dano que salta e a barra de HP escorrendo com o rastro.
+        /// </summary>
+        private IEnumerator PlayImpact(DamageDealt damage)
+        {
+            int side = damage.TargetSide;
+            bool isActive = damage.FighterIndex == _view.Sides[side].ActiveIndex;
+            var widget = _fighters[side];
+            var target = _view.Sides[side].Team[damage.FighterIndex].Spec;
+            var attackerSpec = _view.Sides[1 - side].Active.Spec;
+            float from = isActive ? widget.ShownHp : damage.HpAfter;
+            Apply(damage);
+            if (!isActive)
+            {
+                yield return Wait(0.45f);
+                yield break;
+            }
+            widget.SetHp(from);
+
+            float fraction = Mathf.Clamp01(damage.Amount / (float)target.MaxHp);
+            bool heavy = fraction >= 0.18f || damage.IsCounter || (_incomingSkill != null && _incomingSkill.IsSpecial);
+            bool super = damage.Effectiveness == Effectiveness.SuperEffective;
+            bool weak = damage.Effectiveness == Effectiveness.NotEffective;
+            Color spark = damage.IsCounter ? Theme.Gold : Theme.ElementLight(attackerSpec.Element);
+            float knock = -widget.Facing * Mathf.Lerp(14f, 42f, fraction / 0.35f);
+
+            // 1. Congela o quadro do impacto.
+            float stop = heavy ? Theme.HitStopHeavy : Theme.HitStopLight;
+            _fighters[0].Freeze(stop);
+            _fighters[1].Freeze(stop);
+            widget.Flash(1f, Color.white);
+            widget.SetSquash(1.10f, 0.90f);
+            yield return new WaitForSecondsRealtime(stop);
+
+            // 2. Tremor e zoom na medida do golpe.
+            _stage.Shake(Mathf.Lerp(2.5f, Theme.ShakeMax, fraction / 0.35f) * (heavy ? 1f : 0.75f), heavy ? 0.34f : 0.22f);
+            _stage.Punch(heavy ? 0.022f : 0.008f);
+
+            var sparks = new RawImage[heavy ? 5 : 3];
+            var angles = new float[sparks.Length];
+            for (int i = 0; i < sparks.Length; i++)
+            {
+                angles[i] = (i * 137f + damage.Amount * 7f) % 360f;
+                sparks[i] = SpawnVfx(Art.VfxSpark, widget.CenterX, widget.CenterY - 10f, 60f, 60f, spark, angles[i]);
+            }
+            var ring = SpawnVfx(Art.VfxRing, widget.CenterX, widget.CenterY, 90f, 90f, Theme.WithAlpha(spark, 0.9f));
+
+            int size = super ? 54 : weak ? 34 : heavy ? 48 : 42;
+            Color numberColor = damage.IsCounter ? Theme.Gold : super ? new Color(1f, 0.55f, 0.35f, 1f) : weak ? new Color(0.85f, 0.80f, 0.78f, 1f) : Theme.Bad;
+            var popup = Ui.Label(_overlay, "-" + damage.Amount, widget.CenterX - 150f, widget.CenterY - 130f, 300f, 64f, size, numberColor, TextAnchor.MiddleCenter, FontStyle.Bold, true);
+            Text tagLabel = null;
+            if (super || weak || damage.IsCounter)
+                tagLabel = Ui.Label(_overlay, damage.IsCounter ? "CONTRA-ATAQUE" : super ? "SUPER EFETIVO!" : "POUCO EFETIVO", widget.CenterX - 150f, widget.CenterY - 160f, 300f, 26f,
+                    Theme.FontSmall + 1, damage.IsCounter ? Theme.Gold : super ? Theme.Good : Theme.Muted, TextAnchor.MiddleCenter, FontStyle.Bold, true);
+            var popupRect = popup.rectTransform;
+            Vector2 popupHome = popupRect.anchoredPosition;
+            float drift = widget.Facing * -24f;
+
+            yield return Tween(0.62f, t =>
+            {
+                widget.SetHp(Mathf.Lerp(from, damage.HpAfter, Ease.OutCubic(t * 1.8f)));
+                widget.Flash(1f - Ease.OutQuad(t / 0.22f), Color.white);
+                widget.SetTint(Color.Lerp(new Color(1f, 0.55f, 0.50f, 1f), Color.white, Ease.OutQuad(t / 0.4f)));
+
+                // Recuo rápido e volta amortecida.
+                float push = t < 0.16f ? Ease.OutCubic(t / 0.16f) : 1f - Ease.OutCubic((t - 0.16f) / 0.6f);
+                widget.SetOffset(new Vector2(knock * push + Ease.Wobble(t, 2f) * 3f, 0f));
+                float sq = 1f - Ease.OutCubic(t / 0.35f);
+                widget.SetSquash(1f + 0.10f * sq, 1f - 0.10f * sq);
+                widget.SetRotation(-8f * push);
+
+                float pop = t < 0.25f ? Ease.OutBack(t / 0.25f, 2.2f) : 1f;
+                popupRect.localScale = new Vector3(Mathf.Lerp(0.5f, 1f, pop), Mathf.Lerp(0.5f, 1f, pop), 1f);
+                popupRect.anchoredPosition = popupHome + new Vector2(drift * t, 46f * Ease.OutCubic(t));
+                popup.color = Theme.WithAlpha(numberColor, 1f - Ease.InCubic((t - 0.55f) / 0.45f));
+                if (tagLabel != null) tagLabel.color = Theme.WithAlpha(tagLabel.color, 1f - Ease.InCubic((t - 0.55f) / 0.45f));
+
+                for (int i = 0; i < sparks.Length; i++)
+                {
+                    float a = angles[i] * Mathf.Deg2Rad;
+                    float dist = Mathf.Lerp(10f, heavy ? 120f : 80f, Ease.OutCubic(t * 1.6f));
+                    float sz = Mathf.Lerp(70f, 18f, t * 1.4f);
+                    PlaceVfx(sparks[i], widget.CenterX + Mathf.Cos(a) * dist, widget.CenterY - 10f + Mathf.Sin(a) * dist * 0.7f, sz, sz, 1f - Ease.OutQuad(t * 1.5f));
+                }
+                PlaceVfx(ring, widget.CenterX, widget.CenterY, Mathf.Lerp(90f, heavy ? 280f : 210f, Ease.OutCubic(t)), Mathf.Lerp(90f, heavy ? 280f : 210f, Ease.OutCubic(t)), 1f - Ease.OutQuad(t * 1.4f));
+            });
+
+            foreach (var s in sparks) UnityEngine.Object.Destroy(s.gameObject);
+            UnityEngine.Object.Destroy(ring.gameObject);
+            UnityEngine.Object.Destroy(popup.gameObject);
+            if (tagLabel != null) UnityEngine.Object.Destroy(tagLabel.gameObject);
+            widget.SetHp(damage.HpAfter);
+            widget.SetTint(Color.white);
+            widget.Flash(0f, Color.white);
+        }
+
+        /// <summary>Cura ou efeito por turno: número, barra animada e partículas subindo (cura) ou pulsando (dano contínuo).</summary>
         private IEnumerator PlayHpChange(BattleEvent ev, int side, int fighterIndex, int hpAfter, string popupText, Color color, bool shake)
         {
             bool isActive = fighterIndex == _view.Sides[side].ActiveIndex;
@@ -661,35 +820,147 @@ namespace ComboTactics.UI
                 yield break;
             }
 
+            bool heal = hpAfter >= from;
             widget.SetHp(from);
-            if (shake) _stage.Shake(5.5f, 0.26f);
-            RawImage impact = shake
-                ? SpawnVfx(Art.VfxRing, widget.CenterX, widget.CenterY, 90f, 90f, Theme.Bad)
-                : SpawnVfx(Art.VfxOrb, widget.CenterX, widget.CenterY, 130f, 130f, color);
-            var popup = Ui.Label(_overlay, popupText, widget.CenterX - 150f, widget.CenterY - 120f, 300f, 60f, 44, color, TextAnchor.MiddleCenter, FontStyle.Bold, true);
+            var motes = new RawImage[5];
+            for (int i = 0; i < motes.Length; i++)
+                motes[i] = SpawnVfx(heal ? Art.VfxOrb : Art.VfxSpark, widget.CenterX, widget.CenterY, 24f, 24f, color);
+            var popup = Ui.Label(_overlay, popupText, widget.CenterX - 150f, widget.CenterY - 120f, 300f, 60f, 38, color, TextAnchor.MiddleCenter, FontStyle.Bold, true);
             var popupRect = popup.rectTransform;
             Vector2 popupHome = popupRect.anchoredPosition;
-            yield return Tween(0.55f, t =>
+            if (!heal) _stage.Shake(2f, 0.18f);
+            yield return Tween(0.6f, t =>
             {
-                widget.SetHp(Mathf.Lerp(from, hpAfter, Mathf.Clamp01(t * 1.6f)));
-                popupRect.anchoredPosition = popupHome + new Vector2(0f, 70f * t);
-                popup.color = new Color(color.r, color.g, color.b, 1f - t * t);
-                if (shake)
+                widget.SetHp(Mathf.Lerp(from, hpAfter, Ease.OutCubic(t * 1.6f)));
+                popupRect.anchoredPosition = popupHome + new Vector2(0f, 56f * Ease.OutCubic(t));
+                popup.color = Theme.WithAlpha(color, 1f - Ease.InCubic((t - 0.5f) / 0.5f));
+                widget.SetTint(Color.Lerp(Color.white, color, 0.45f * Mathf.Sin(t * Mathf.PI)));
+                for (int i = 0; i < motes.Length; i++)
                 {
-                    widget.SetTint(Color.Lerp(new Color(1f, 0.3f, 0.3f, 1f), Color.white, t));
-                    widget.SetOffset(new Vector2(Mathf.Sin(t * 42f) * 12f * (1f - t), 0f));
-                    PlaceVfx(impact, widget.CenterX, widget.CenterY, Mathf.Lerp(90f, 230f, t), Mathf.Lerp(90f, 230f, t), 1f - t);
-                }
-                else
-                {
-                    PlaceVfx(impact, widget.CenterX, widget.CenterY - 40f * t, Mathf.Lerp(110f, 190f, t), Mathf.Lerp(110f, 190f, t), Mathf.Sin(t * Mathf.PI) * 0.65f);
+                    float p = Mathf.Clamp01(t * 1.3f - i * 0.06f);
+                    float x = widget.CenterX + (i - 2) * 26f + Mathf.Sin((p + i) * 6f) * 8f;
+                    float y = heal ? widget.CenterY + 60f - 150f * p : widget.CenterY - 20f + Mathf.Sin(i * 1.7f) * 40f;
+                    PlaceVfx(motes[i], x, y, heal ? 22f : Mathf.Lerp(40f, 10f, p), heal ? 22f : Mathf.Lerp(40f, 10f, p), Mathf.Sin(p * Mathf.PI) * 0.9f);
                 }
             });
-            UnityEngine.Object.Destroy(impact.gameObject);
+            foreach (var m in motes) UnityEngine.Object.Destroy(m.gameObject);
             UnityEngine.Object.Destroy(popup.gameObject);
+            widget.SetTint(Color.white);
             widget.SetHp(hpAfter);
-            yield return Wait(0.15f);
+            yield return Wait(0.10f);
+        }
 
+        /// <summary>Efeito aplicado: anel na cor do efeito e o nome dele subindo sobre o lutador.</summary>
+        private IEnumerator PlayEffectMark(int side, int fighterIndex, EffectSpec effect)
+        {
+            if (fighterIndex != _view.Sides[side].ActiveIndex) { yield return Wait(0.35f); yield break; }
+            var widget = _fighters[side];
+            Color color = StatusPips.EffectColor(effect);
+            var ring = SpawnVfx(Art.VfxRuneCircle, widget.CenterX, widget.CenterY + 92f, 120f, 34f, color);
+            var tag = FloatingTag(widget, effect.Name.ToUpperInvariant(), color);
+            yield return Tween(0.5f, t =>
+            {
+                PlaceVfx(ring, widget.CenterX, widget.CenterY + 92f, Mathf.Lerp(120f, 300f, Ease.OutCubic(t)), Mathf.Lerp(34f, 80f, Ease.OutCubic(t)), 1f - t);
+                widget.SetTint(Color.Lerp(Color.white, color, 0.35f * Mathf.Sin(t * Mathf.PI)));
+                MoveTag(tag, widget, t);
+            });
+            widget.SetTint(Color.white);
+            UnityEngine.Object.Destroy(ring.gameObject);
+            UnityEngine.Object.Destroy(tag.gameObject);
+        }
+
+        /// <summary>Queda: flash, os joelhos cedem, o corpo perde a cor e se desfaz em partículas do elemento.</summary>
+        private IEnumerator PlayFaint(int side)
+        {
+            var widget = _fighters[side];
+            var spec = _view.Sides[side].Active.Spec;
+            Color element = Theme.ElementLight(spec.Element);
+            var motes = new RawImage[10];
+            var seeds = new float[motes.Length];
+            for (int i = 0; i < motes.Length; i++)
+            {
+                seeds[i] = i * 0.618f;
+                motes[i] = SpawnVfx(i % 3 == 0 ? Art.VfxSpark : Art.VfxOrb, widget.CenterX, widget.CenterY, 18f, 18f, Theme.WithAlpha(element, 0f));
+            }
+            _stage.Shake(3.5f, 0.3f);
+            yield return Tween(0.85f, t =>
+            {
+                float buckle = Ease.OutCubic(t / 0.35f);
+                float fade = Ease.InQuad((t - 0.25f) / 0.75f);
+                widget.Flash(1f - Ease.OutQuad(t / 0.18f), Color.white);
+                widget.SetSquash(1f + 0.10f * buckle, 1f - 0.22f * buckle);
+                widget.SetRotation(-14f * buckle);
+                widget.SetOffset(new Vector2(-widget.Facing * 12f * buckle, -14f * buckle));
+                widget.SetTint(Color.Lerp(Color.white, new Color(0.45f, 0.43f, 0.48f, 1f), buckle));
+                widget.SetAlpha(1f - fade);
+                for (int i = 0; i < motes.Length; i++)
+                {
+                    float p = Mathf.Clamp01((t - 0.2f - (i % 5) * 0.05f) / 0.7f);
+                    float x = widget.CenterX + Mathf.Sin(seeds[i] * 9f) * 70f + Mathf.Sin(p * 5f + i) * 10f;
+                    float y = widget.CenterY + 60f - Mathf.Cos(seeds[i] * 5f) * 40f - 170f * Ease.OutQuad(p);
+                    float sz = Mathf.Lerp(20f, 8f, p);
+                    PlaceVfx(motes[i], x, y, sz, sz, Mathf.Sin(p * Mathf.PI) * 0.9f);
+                }
+            });
+            foreach (var m in motes) UnityEngine.Object.Destroy(m.gameObject);
+            widget.SetAlpha(0f);
+            widget.SetSquash(1f, 1f);
+            widget.SetRotation(0f);
+            widget.SetOffset(Vector2.zero);
+            widget.SetTint(Color.white);
+        }
+
+        /// <summary>Volta suave de todos à posição de guarda depois de um golpe.</summary>
+        private IEnumerator RecoverPoses(float seconds)
+        {
+            _fighters[0].CapturePose();
+            _fighters[1].CapturePose();
+            yield return Tween(seconds, t =>
+            {
+                float k = 1f - Ease.OutCubic(t);
+                for (int i = 0; i < 2; i++) _fighters[i].Relax(k);
+            });
+            ResetPoses();
+        }
+
+        /// <summary>Faixa "RODADA N" que cruza o céu da arena sem segurar a batalha.</summary>
+        private IEnumerator RoundBanner(int round)
+        {
+            var band = Ui.Node(_overlay, "RoundBanner", 0, 150, Theme.Width, 56);
+            var shade = Ui.Picture(band, "Shade", Art.VfxShard, 240, 0, 800, 56);
+            shade.color = new Color(0f, 0f, 0f, 0f);
+            var label = Ui.Label(band, "RODADA " + round, 0, 0, Theme.Width, 56, 34, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold, true);
+            var labelRect = label.rectTransform;
+            float t = 0f;
+            while (t < 1f)
+            {
+                if (band == null) yield break;
+                t += Time.deltaTime * Speed / 0.95f;
+                float enter = Ease.OutCubic(t / 0.25f);
+                float leave = Ease.InCubic((t - 0.70f) / 0.30f);
+                Ui.Place(labelRect, (1f - enter) * 120f - leave * 120f, 0f, Theme.Width, 56f);
+                label.color = Theme.WithAlpha(Theme.Gold, enter * (1f - leave));
+                shade.color = new Color(0f, 0f, 0f, 0.45f * enter * (1f - leave));
+                yield return null;
+            }
+            if (band != null) UnityEngine.Object.Destroy(band.gameObject);
+        }
+
+        private void StartFx(IEnumerator routine)
+        {
+            _fxRoutines.RemoveAll(r => r == null);
+            _fxRoutines.Add(App.Host.StartCoroutine(Coroutines.Guard(routine, OnError)));
+        }
+
+        private Text FloatingTag(FighterWidget widget, string text, Color color)
+        {
+            return Ui.Label(_overlay, text, widget.CenterX - 160f, widget.CenterY - 150f, 320f, 30f, Theme.FontHeading, color, TextAnchor.MiddleCenter, FontStyle.Bold, true);
+        }
+
+        private static void MoveTag(Text tag, FighterWidget widget, float t)
+        {
+            Ui.Place(tag.rectTransform, widget.CenterX - 160f, widget.CenterY - 150f - 30f * Ease.OutCubic(t), 320f, 30f);
+            tag.color = Theme.WithAlpha(tag.color, 1f - Ease.InCubic((t - 0.6f) / 0.4f));
         }
 
         /// <summary>Segunda fase do Guardião do Núcleo: tremor, aura e fala. Os bônus em si já vieram do motor.</summary>
@@ -773,17 +1044,51 @@ namespace ComboTactics.UI
             }
         }
 
+        /// <summary>Troca: quem sai é recolhido num feixe do elemento; quem entra é invocado no anel de runas.</summary>
         private IEnumerator PlaySwitch(Switched e)
         {
             var widget = _fighters[e.Side];
             string incoming = Who(e.Side, e.ToIndex);
             Say(e.Forced ? incoming + " entrou na arena!" : _match.SideNames[e.Side] + " trocou: " + incoming + " entrou na arena!");
-            if (!e.Forced) yield return Tween(0.2f, t => widget.SetAlpha(1f - t));
+
+            if (!e.Forced)
+            {
+                var leaving = _view.Sides[e.Side].Active.Spec;
+                var beam = SpawnVfx(Art.VfxPillar, widget.CenterX, widget.CenterY, 120f, 300f, Theme.ElementColor(leaving.Element));
+                yield return Tween(0.24f, t =>
+                {
+                    float k = Ease.InCubic(t);
+                    widget.SetSquash(1f - 0.6f * k, 1f + 0.35f * k);
+                    widget.Flash(k, Theme.ElementLight(leaving.Element));
+                    widget.SetAlpha(1f - k);
+                    PlaceVfx(beam, widget.CenterX, widget.CenterY, Mathf.Lerp(150f, 40f, k), 320f, Mathf.Sin(t * Mathf.PI));
+                });
+                UnityEngine.Object.Destroy(beam.gameObject);
+            }
+
             Apply(e);
             ShowActive(e.Side);
             widget.ResetPose();
-            yield return Tween(0.25f, t => widget.SetAlpha(t));
-            yield return Wait(0.25f);
+            widget.SetAlpha(0f);
+            var spec = _view.Sides[e.Side].Active.Spec;
+            Color element = Theme.ElementColor(spec.Element);
+            var circle = SpawnVfx(Art.VfxRuneCircle, widget.CenterX, widget.CenterY + 92f, 80f, 24f, element);
+            var pillar = SpawnVfx(Art.VfxPillar, widget.CenterX, widget.CenterY, 160f, 320f, Theme.ElementLight(spec.Element));
+            yield return Tween(0.42f, t =>
+            {
+                float grow = Ease.OutBack(t / 0.7f, 1.8f);
+                widget.SetAlpha(Ease.OutQuad(t / 0.35f));
+                widget.SetScale(Mathf.Lerp(0.35f, 1f, grow));
+                widget.SetSquash(1f + 0.15f * (1f - Ease.OutCubic(t)), 1f - 0.12f * (1f - Ease.OutCubic(t)));
+                widget.Flash(1f - Ease.OutQuad(t / 0.6f), Color.white);
+                PlaceVfx(circle, widget.CenterX, widget.CenterY + 92f, Mathf.Lerp(80f, 300f, Ease.OutCubic(t)), Mathf.Lerp(24f, 80f, Ease.OutCubic(t)), 1f - t * t);
+                PlaceVfx(pillar, widget.CenterX, widget.CenterY, Mathf.Lerp(160f, 60f, t), 340f, (1f - t) * 0.8f);
+            });
+            UnityEngine.Object.Destroy(circle.gameObject);
+            UnityEngine.Object.Destroy(pillar.gameObject);
+            widget.ResetPose();
+            widget.SetAlpha(1f);
+            yield return Wait(0.18f);
         }
 
         /// <summary>Introdução cinematográfica da arena no início do combate.</summary>
@@ -883,8 +1188,7 @@ namespace ComboTactics.UI
 
                 // O próprio campo de batalha atrás dos lutadores pulsa com a prévia da arena candidata!
                 _stage.PreviewPulse(id, 0.28f);
-                _arenaName.text = "Sorteando: " + arenas[id].Name + "...";
-                _arenaName.color = activeColor;
+                _medallion.SetPreview(arenas[id].Name.ToUpperInvariant() + "?", activeColor);
 
                 float progress = i / (float)flips;
                 yield return Wait(0.05f + 0.25f * progress * progress);
@@ -958,23 +1262,14 @@ namespace ComboTactics.UI
         {
             var arena = CurrentArena;
             Color arenaColor = Theme.ArenaColor(arena.Id);
-            Color borderTint = Color.Lerp(Theme.BorderGold, arenaColor, 0.50f);
-            if (_topBorder != null) _topBorder.color = borderTint;
-            if (_dockBorder != null) _dockBorder.color = borderTint;
-
-            _arenaName.text = "Arena: " + arena.Name;
-            _arenaName.color = Color.Lerp(Theme.Gold, arenaColor, 0.45f);
-            _arenaEffect.text = Theme.ArenaEffect(arena, _engine.Rules);
-            bool drawSoon = _view.RoundsUntilArenaDraw == 1;
-            _roundInfo.text = "Rodada " + _view.Round + "  ·  " +
-                              (drawSoon ? "★ SORTEIO DE ARENA NA PRÓXIMA RODADA!" : "sorteio em " + _view.RoundsUntilArenaDraw + " rodadas");
-            _roundInfo.color = drawSoon ? arenaColor : Theme.Gold;
+            if (_dockBorder != null) _dockBorder.color = Color.Lerp(Theme.BorderGold, arenaColor, 0.35f);
+            _medallion.Refresh(arena, _engine.Rules, _view.Round, _view.RoundsUntilArenaDraw, _engine.Rules.ArenaDrawInterval);
 
             for (int side = 0; side < 2; side++)
             {
                 var active = _view.Sides[side].Active;
                 _teams[side].Refresh(_view.Sides[side], _engine.Catalog, _engine.Rules.StaminaMax);
-                _fighters[side].SetEffects(BattleText.Effects(active.Effects, _engine.Catalog));
+                _fighters[side].SetEffects(active.Effects, _engine.Catalog);
                 _fighters[side].RefreshArenaSynergy(active.Spec, active.Fainted, arena, _engine.Rules);
             }
         }
@@ -992,7 +1287,7 @@ namespace ComboTactics.UI
 
         private void Say(string text)
         {
-            _message.text = text;
+            _message.text = Ui.Safe(text);
         }
 
         private string Who(int side, int fighterIndex)

@@ -324,6 +324,22 @@ namespace ComboTactics.UI
             }
         }
 
+        /// <summary>Faísca de impacto em estrela de 4 pontas (o brilho de um fragmento de cristal).</summary>
+        public static Texture2D VfxSpark
+        {
+            get
+            {
+                return BuildVfx("vfx/spark", 96, (nx, ny) =>
+                {
+                    float ax = Mathf.Abs(nx), ay = Mathf.Abs(ny);
+                    float cross = Mathf.Max(Mathf.Clamp01(1f - ax / 0.10f) * Mathf.Clamp01(1f - ay), Mathf.Clamp01(1f - ay / 0.10f) * Mathf.Clamp01(1f - ax));
+                    float diag = Mathf.Clamp01(1f - Mathf.Abs(ax - ay) / 0.07f) * Mathf.Clamp01(1f - (ax + ay) / 0.9f) * 0.55f;
+                    float core = Mathf.Clamp01(1f - Mathf.Sqrt(nx * nx + ny * ny) / 0.28f);
+                    return Mathf.Max(Mathf.Max(cross * cross, diag), core);
+                });
+            }
+        }
+
         /// <summary>Linhas de velocidade horizontais para o cut-in do Golpe Especial.</summary>
         public static Texture2D VfxStreaks
         {
