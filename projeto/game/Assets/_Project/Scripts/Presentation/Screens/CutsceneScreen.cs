@@ -20,6 +20,7 @@ namespace ComboTactics.UI
         private readonly int _cutsceneId;
         private readonly Action _onComplete;
         private int _index;
+        private bool _finished;
         private Coroutine _animRoutine;
         private bool _typingComplete;
         private Text _dialogueTextLabel;
@@ -86,7 +87,7 @@ namespace ComboTactics.UI
             {
                 Ui.Button(Root, "◂ Anterior", 956, 14, 112, 40, PrevSlide, Theme.Button, 14);
             }
-            Ui.Button(Root, "Pular Cutscene ⏭", 1078, 14, 178, 40, FinishCutscene, Theme.Button, 14);
+            Ui.Button(Root, "Pular", 1078, 14, 178, 40, FinishCutscene, Theme.Button, 14);
 
             // 2. Palco Cinematográfico Central (varia conforme CutsceneVisualKind)
             var stage = Ui.Node(Root, "StageArea", 0, 72, Theme.Width, 366);
@@ -139,8 +140,8 @@ namespace ComboTactics.UI
 
             bool isLast = _index >= slides.Length - 1;
             string nextLabel = isLast
-                ? (_cutsceneId == 4 ? "Concluir Jornada ★" : "Ir ao Espectro ⚔")
-                : "Próxima Cena ▸";
+                ? (_cutsceneId == 4 ? "Concluir jornada" : "Continuar")
+                : "Próxima cena";
             Ui.Button(storyPanel, nextLabel, 958, 108, 220, 68, OnAdvancePressed, Theme.ButtonPrimary, 20);
             Ui.Label(storyPanel, "[Espaço, Enter ou Clique]", 958, 182, 220, 22, 12, Theme.Muted, TextAnchor.MiddleCenter);
             Ui.Label(storyPanel, "Afinidade do Mago: " + Theme.ElementName(playerAffinity),
@@ -306,11 +307,11 @@ namespace ComboTactics.UI
             DrawMageCard(stage, 44, 64, affCol, animatedRings, animatedPortraits);
 
             var header = Ui.Frame(stage, "AffinityBanner", 326, 8, 914, 40, new Color(0.07f, 0.05f, 0.13f, 0.95f), Theme.Gold, 1.5f);
-            Ui.Label(header, "✦ ESCOLHA A AFINIDADE ELEMENTAL DO MAGO (DEFINE AS 3 LENDAS INICIAIS DO SEU ESPECTRO) ✦",
+            Ui.Label(header, currentAffinity == Element.Neutral ? "TRÊS AFINIDADES, TRÊS CAMINHOS · A ESCOLHA DEFINE OS 3 PRIMEIROS LUTADORES DO ESPECTRO" : "A AFINIDADE DO MAGO DEFINE OS 3 PRIMEIROS LUTADORES DO ESPECTRO",
                 8, 0, 894, 36, 14, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold, true);
 
             Element[] elements = { Element.Fire, Element.Water, Element.Plant };
-            string[] titles = { "AFINIDADE: FOGO 🔥", "AFINIDADE: ÁGUA 💧", "AFINIDADE: PLANTA 🌿" };
+            string[] titles = { "AFINIDADE: FOGO", "AFINIDADE: ÁGUA", "AFINIDADE: PLANTA" };
             string[] rules =
             {
                 "Vantagem contra Planta (+30%)\nRessonância na Arena Vulcão",
@@ -346,13 +347,10 @@ namespace ComboTactics.UI
                     Ui.Label(mini, Theme.ClassName(def.Class), 4, 112, 74, 24, 10, eCol, TextAnchor.MiddleCenter);
                 }
 
-                Element captured = elem;
-                string btnLabel = isSelected ? "✓ AFINIDADE ATIVA" : "Escolher " + Theme.ElementName(elem);
-                Ui.Button(card, btnLabel, 18, 240, 256, 44, () =>
-                {
-                    CampaignStory.SetPlayerAffinity(captured);
-                    Rebuild();
-                }, isSelected ? Theme.ButtonPrimary : Theme.Button, 15);
+                // A escolha em si acontece na tela de afinidade, logo depois do prólogo: aqui as cartas só apresentam os caminhos.
+                string tag = isSelected ? "AFINIDADE DO MAGO" : currentAffinity == Element.Neutral ? "UM CAMINHO POSSÍVEL" : "OUTRO CAMINHO";
+                var tagBox = Ui.Frame(card, "Tag", 18, 240, 256, 44, isSelected ? Theme.ButtonPrimary : Theme.PanelLight, isSelected ? Theme.Gold : eCol, 1.5f);
+                Ui.Label(tagBox, tag, 0, 0, 252, 40, 14, isSelected ? Color.white : eCol, TextAnchor.MiddleCenter, FontStyle.Bold);
             }
         }
 
@@ -368,7 +366,7 @@ namespace ComboTactics.UI
             DrawMageCard(stage, 54, 66, affinityColor, animatedRings, animatedPortraits);
 
             var pactBanner = Ui.Frame(stage, "SpectrumBanner", 356, 10, 868, 42, new Color(0.07f, 0.05f, 0.12f, 0.94f), Theme.Gold, 1.5f);
-            Ui.Label(pactBanner, "✦ RESSONÂNCIA DO FRAGMENTO: +3 LENDAS INTEGRADAS AO SEU ESPECTRO ELEMENTAL! ✦",
+            Ui.Label(pactBanner, "NOVOS LUTADORES NO ESPECTRO DE " + CampaignStory.SummonerName.ToUpperInvariant(),
                 10, 0, 844, 38, 16, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold, true);
 
             for (int i = 0; i < slide.SummonedElementals.Length; i++)
@@ -387,13 +385,13 @@ namespace ComboTactics.UI
 
                 var card = Ui.Frame(stage, "ElemCard" + i, cx + 14, 62, 248, 266, new Color(0.06f, 0.06f, 0.10f, 0.96f), elemCol, 2.5f);
                 var badge = Ui.Box(card, "NewBadge", 10, 8, 224, 24, new Color(elemCol.r * 0.28f, elemCol.g * 0.28f, elemCol.b * 0.28f, 0.95f));
-                Ui.Label(badge.transform, "★ NO SEU ESPECTRO (100% HP)", 0, 0, 224, 24, 11, elemCol, TextAnchor.MiddleCenter, FontStyle.Bold);
+                Ui.Label(badge.transform, "NO ESPECTRO · HP CHEIO", 0, 0, 224, 24, 11, elemCol, TextAnchor.MiddleCenter, FontStyle.Bold);
 
                 Ui.Picture(card, "Sprite", Art.Fighter(def.Id, def.Element, def.Class), 58, 36, 128, 128);
                 Ui.Label(card, def.Appearance.ToUpper(), 8, 168, 228, 24, 16, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold, true);
                 Ui.Label(card, def.Name + " · " + Theme.ElementName(def.Element),
                     8, 194, 228, 20, 13, elemCol, TextAnchor.MiddleCenter, FontStyle.Bold);
-                Ui.Label(card, "Pronto para ser convocado pelo Mago",
+                Ui.Label(card, "Pronto para o chamado do mago",
                     8, 220, 228, 22, 11, Theme.Good, TextAnchor.MiddleCenter, FontStyle.Italic);
                 animatedPortraits.Add((RectTransform)card.parent);
             }
@@ -471,7 +469,7 @@ namespace ComboTactics.UI
 
             var summonerCard = Ui.Frame(stage, "SummonerFrame", x, y, 200, 232, new Color(0.08f, 0.05f, 0.14f, 0.95f), Theme.Gold, 2.5f);
             Ui.Picture(summonerCard, "SummonerArt", Art.Fighter(Art.SummonerId, Element.Neutral, CharClass.Mage), 22, 10, 152, 152);
-            Ui.Label(summonerCard, "O MAGO (VOCÊ)", 6, 166, 184, 22, 14, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold, true);
+            Ui.Label(summonerCard, CampaignStory.SummonerName.ToUpperInvariant() + " (VOCÊ)", 6, 166, 184, 22, 14, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold, true);
             Ui.Label(summonerCard, "Afinidade: " + Theme.ElementName(CampaignStory.GetPlayerAffinity()),
                 6, 190, 184, 22, 12, affinityColor, TextAnchor.MiddleCenter, FontStyle.Bold);
             animatedPortraits.Add((RectTransform)summonerCard.parent);
@@ -555,6 +553,7 @@ namespace ComboTactics.UI
 
         private void NextSlide()
         {
+            if (_finished) return;
             _index++;
             if (_index >= ActiveSlides.Length)
                 FinishCutscene();
@@ -564,6 +563,9 @@ namespace ComboTactics.UI
 
         private void FinishCutscene()
         {
+            // Pular e o último "Continuar" no mesmo quadro não podem avançar a história duas vezes.
+            if (_finished) return;
+            _finished = true;
             CampaignStory.MarkCutsceneSeen(_cutsceneId);
             if (_onComplete != null) _onComplete();
             else App.ShowCampaign();

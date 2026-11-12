@@ -14,6 +14,8 @@ namespace ComboTactics.Game
         public readonly ProfileService Profile;
         public readonly StoreService Store;
         public readonly CampaignService Campaign;
+        public readonly JourneyService Journey;
+        public readonly MissionService Missions;
         public readonly BattleLauncher Launcher;
 
         public GameServices(ISaveStore saveStore, ContentDatabase content = null, EconomyConfig economy = null, BattleRules rules = null)
@@ -24,7 +26,9 @@ namespace ComboTactics.Game
             Profile = new ProfileService(saveStore, Content, Economy);
             Store = new StoreService(Profile, Content, Economy);
             Campaign = new CampaignService(Profile, Content);
-            Launcher = new BattleLauncher(Content, Economy, Rules, Profile, Campaign);
+            Journey = new JourneyService(Profile, Content, Economy);
+            Missions = new MissionService(Profile, Journey, Content);
+            Launcher = new BattleLauncher(Content, Economy, Rules, Profile, Campaign, Journey);
         }
     }
 }

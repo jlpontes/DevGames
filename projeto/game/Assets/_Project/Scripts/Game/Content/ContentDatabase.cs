@@ -22,14 +22,18 @@ namespace ComboTactics.Game
         /// <summary>Kit fixo do Modo Justo do PvP e do oponente no modo contra IA.</summary>
         public readonly IReadOnlyDictionary<string, int> FairKit;
         public readonly IReadOnlyDictionary<string, int> VsAiOpponentKit;
+        /// <summary>Missões secundárias, na ordem do quadro.</summary>
+        public readonly IReadOnlyList<MissionDef> Missions;
 
         private readonly Dictionary<string, CharacterDef> _charactersById = new Dictionary<string, CharacterDef>();
 
         public ContentDatabase(IReadOnlyList<CharacterDef> characters, IReadOnlyDictionary<string, SkillSpec> skills,
             IReadOnlyList<EffectSpec> effects, IReadOnlyList<ItemSpec> items, IReadOnlyList<ArenaSpec> arenas,
             IReadOnlyList<AIProfile> aiProfiles, IReadOnlyList<string> difficultyIds, IReadOnlyList<OpponentDef> opponents,
-            IReadOnlyDictionary<string, int> fairKit, IReadOnlyDictionary<string, int> vsAiOpponentKit)
+            IReadOnlyDictionary<string, int> fairKit, IReadOnlyDictionary<string, int> vsAiOpponentKit,
+            IReadOnlyList<MissionDef> missions = null)
         {
+            Missions = missions ?? new MissionDef[0];
             Characters = characters;
             Skills = skills;
             Items = items;
@@ -67,6 +71,13 @@ namespace ComboTactics.Game
         {
             CharacterDef def;
             return id != null && _charactersById.TryGetValue(id, out def) ? def : null;
+        }
+
+        public MissionDef Mission(string id)
+        {
+            if (id == null) return null;
+            foreach (var mission in Missions) if (mission.Id == id) return mission;
+            return null;
         }
 
         public ItemSpec Item(string id)

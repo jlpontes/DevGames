@@ -38,6 +38,9 @@ namespace ComboTactics.Tests
             foreach (var item in d.items) sb.Append(item.id).Append(':').Append(item.count).Append(',');
             sb.Append('\n');
             foreach (var u in d.upgrades) sb.Append(u.charId).Append(':').Append(u.hp).Append(':').Append(u.atk).Append(':').Append(u.def).Append(':').Append(u.spd).Append(',');
+            sb.Append('\n').Append(d.affinity ?? "").Append('\n').Append(string.Join(",", d.recruits)).Append('\n');
+            foreach (var e in d.journeyHp) sb.Append(e.charId).Append(':').Append(e.hp).Append(',');
+            sb.Append('\n').Append(string.Join(",", d.seenStory)).Append('\n').Append(string.Join(",", d.missionsDone));
             return sb.ToString();
         }
 
@@ -66,6 +69,18 @@ namespace ComboTactics.Tests
                     def = int.Parse(kv[3], CultureInfo.InvariantCulture), spd = int.Parse(kv[4], CultureInfo.InvariantCulture),
                 });
             }
+            if (lines.Length > 6)
+            {
+                d.affinity = lines[6];
+                d.recruits.AddRange(lines[7].Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries));
+                foreach (var part in lines[8].Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    var kv = part.Split(':');
+                    d.journeyHp.Add(new HpEntry { charId = kv[0], hp = int.Parse(kv[1], CultureInfo.InvariantCulture) });
+                }
+                d.seenStory.AddRange(lines[9].Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries));
+                d.missionsDone.AddRange(lines[10].Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries));
+            }
             return d;
         }
     }
@@ -81,6 +96,15 @@ namespace ComboTactics.Tests
         {
             _storage = new FakeStorage();
             _game = NewSession();
+            // Estes testes cobrem regras de batalha e economia: o espectro inteiro e a afinidade ficam liberados.
+            // Afinidade, espectro e missões têm testes próprios em JourneyAndMissionTests.
+            UnlockWholeSpectrum(_game);
+        }
+
+        public static void UnlockWholeSpectrum(GameServices game)
+        {
+            game.Profile.SetAffinity(Element.Fire);
+            foreach (var c in game.Content.PlayableCharacters) game.Profile.AddRecruit(c.Id);
         }
 
         /// <summary>Simula abrir o jogo de novo sobre o mesmo armazenamento.</summary>
@@ -112,7 +136,8 @@ namespace ComboTactics.Tests
             Assert.AreEqual(9, _game.Content.PlayableCharacters.Count);
             Assert.AreEqual(4, _game.Content.Opponents.Count);
             Assert.AreEqual(4, _game.Content.Items.Count);
-            Assert.AreEqual(7, _game.Content.AiProfiles.Count);
+            Assert.AreEqual(8, _game.Content.AiProfiles.Count);
+            Assert.AreEqual(9, _game.Content.Missions.Count);
         }
 
         [TestCase("fire_warrior", 620, 130, 45, 77)]
@@ -193,8 +218,8 @@ namespace ComboTactics.Tests
             Assert.AreEqual(ArenaId.Sea, match.Setup.StartArena);
             Assert.AreEqual(3, match.Setup.Teams[1].Count);
             foreach (var fighter in match.Setup.Teams[1]) Assert.AreEqual(Element.Water, fighter.Element);
-            Assert.AreEqual(127, match.Setup.Teams[1][0].Attack); // Guerreiro de Água: 119 × 1,07 = 127,33
-            Assert.AreEqual(0.40, match.OpponentAi.QteChance, 1e-9);
+            Assert.AreEqual(StatsResolver.Scale(119, 1 + BuiltInContent.StageBonus[1]), match.Setup.Teams[1][0].Attack); // Guerreiro de Água com o bônus da fase
+            Assert.AreSame(_game.Content.AiProfiles[BuiltInContent.GuardianWater], match.OpponentAi);
             Assert.AreEqual(1, match.Setup.Items[1][BuiltInContent.MedKit]);
             Assert.AreEqual(1, match.Setup.Items[1][BuiltInContent.Medicine]);
         }
@@ -207,7 +232,8 @@ namespace ComboTactics.Tests
 
             Assert.AreEqual(ArenaId.Moon, match.Setup.StartArena);
             Assert.AreEqual(1, match.Setup.Teams[1].Count);
-            Assert.That(match.Setup.Teams[1][0].MaxHp, Is.InRange(2400, 2800)); // R9: cerca de 3× o HP de um jogável
+            Assert.That(_game.Content.Character(BuiltInContent.BossId).BaseHp, Is.InRange(2400, 2800)); // R9: cerca de 3× o HP de um jogável
+            Assert.AreEqual(StatsResolver.Scale(2600, 1 + BuiltInContent.StageBonus[3]), match.Setup.Teams[1][0].MaxHp);
         }
 
         [Test]

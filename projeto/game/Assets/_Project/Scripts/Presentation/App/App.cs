@@ -51,6 +51,7 @@ namespace ComboTactics.UI
             _overlayLayer = Ui.Node(stage, "Overlay", 0, 0, Theme.Width, Theme.Height);
             Errors = new ErrorReporter(ShowErrorDialog);
             Ui.OnPlayerMessage = Notify;
+            CampaignStory.Bind(services);
         }
 
         public void Show(UiScreen screen)
@@ -63,6 +64,8 @@ namespace ComboTactics.UI
 
         internal void Redraw(UiScreen screen)
         {
+            // Redesenhar a mesma tela também encerra as coroutines dela; senão cada Rebuild deixa uma a mais rodando.
+            if (_current == screen) screen.Close();
             if (_currentRoot != null) UnityEngine.Object.Destroy(_currentRoot.gameObject);
             _current = screen;
             _currentRoot = Ui.Node(_screenLayer, screen.GetType().Name, 0, 0, Theme.Width, Theme.Height);
@@ -72,14 +75,67 @@ namespace ComboTactics.UI
         // ── Fluxo de telas (telas.excalidraw) ────────────────────────────────────
 
         public void ShowMenu() { Show(new MainMenuScreen()); }
-        public void ShowCampaign() { Show(new CampaignMapScreen()); }
         public void ShowStore() { Show(new StoreScreen()); }
-        public void ShowVsAi() { Show(new VsAiScreen()); }
-        public void ShowPvp() { Show(new PvpScreen()); }
+
+        /// <summary>Mapa da jornada. Sem afinidade escolhida, começa pela abertura e pela escolha da afinidade.</summary>
+        public void ShowCampaign()
+        {
+            if (!Services.Journey.HasAffinity) { StartJourney(); return; }
+            Show(new CampaignMapScreen());
+        }
+
+        /// <summary>Contra IA e PvP usam o espectro (R11): sem afinidade, o jogador passa antes pela abertura da história.</summary>
+        public void ShowVsAi()
+        {
+            if (!RequireSpectrum()) return;
+            Show(new VsAiScreen());
+        }
+
+        public void ShowPvp()
+        {
+            if (!RequireSpectrum()) return;
+            Show(new PvpScreen());
+        }
+
+        private bool RequireSpectrum()
+        {
+            if (Services.Journey.HasAffinity) return true;
+            Notify("Escolha a afinidade do seu mago para formar o espectro de lutadores.");
+            StartJourney();
+            return false;
+        }
+
+        /// <summary>Abertura da história → escolha da afinidade → cartão do primeiro chamado → mapa.</summary>
+        public void StartJourney()
+        {
+            Show(new CutsceneScreen(CampaignStory.GetPrologueCutscene(), -1, () => Show(new AffinitySelectScreen())));
+        }
+
+        /// <summary>Grava a afinidade e mostra os 3 lutadores entrando no espectro.</summary>
+        public void ChooseAffinity(Core.Element affinity)
+        {
+            Services.Journey.ChooseAffinity(affinity);
+            Show(new CutsceneScreen(CampaignStory.GetAffinityCutscene(affinity), -1, ShowCampaign));
+        }
+
+        /// <summary>Quadro das missões secundárias ("Ecos do Cristal").</summary>
+        public void ShowMissions()
+        {
+            if (!Services.Journey.HasAffinity) { StartJourney(); return; }
+            Show(new MissionBoardScreen());
+        }
+
+        /// <summary>Apresentação da missão → seleção de equipe com as regras dela.</summary>
+        public void StartMission(MissionDef mission)
+        {
+            var request = new MatchRequest { Mode = GameMode.Mission, MissionId = mission.Id };
+            Show(new CutsceneScreen(CampaignStory.GetMissionBriefing(mission), -1, () => ShowTeamSelect(request, 0)));
+        }
 
         /// <summary>Botão único de História Contínua: retoma do ponto salvo (Cutscene do Ato -> Santuário/Equipe -> Batalha).</summary>
         public void ContinueCampaignStory()
         {
+            if (!Services.Journey.HasAffinity) { StartJourney(); return; }
             int currentStage = Mathf.Clamp(Services.Profile.CampaignStage, 0, Services.Campaign.Stages.Count - 1);
             PlayCampaignStage(currentStage, false);
         }
@@ -102,7 +158,6 @@ namespace ComboTactics.UI
         public void StartBattle(MatchRequest request)
         {
             var match = Services.Launcher.Create(request);
-            CampaignStory.EnhanceCampaignMatch(match, Services.Content, Services.Rules);
             Show(new BattleScreen(match));
         }
 
@@ -112,6 +167,7 @@ namespace ComboTactics.UI
         public void ShowModeHome(GameMode mode)
         {
             if (mode == GameMode.Campaign) ShowCampaign();
+            else if (mode == GameMode.Mission) ShowMissions();
             else ShowMenu();
         }
 

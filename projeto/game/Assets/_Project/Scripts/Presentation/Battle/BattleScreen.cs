@@ -34,7 +34,6 @@ namespace ComboTactics.UI
         private ReactionResult? _syncedReaction;
         private float _animTimeScale = 1f;
         private bool _syncingReaction;
-        private bool _bossPhase2Triggered;
         private bool _lastStandTriggered;
         private Text _arenaName;
         private Text _arenaEffect;
@@ -56,8 +55,6 @@ namespace ComboTactics.UI
         {
             _engine = new BattleEngine(_match.Setup);
             _view = new BattleSnapshot(_engine.State);
-            if (_match.Mode == GameMode.Campaign)
-                CampaignStory.ApplyPersistentHpToBattle(_engine, _view);
             // Seed e comandos reproduzem a batalha inteira: vão junto no relatório de erro.
             App.Errors.Context = () => "Batalha " + _match.Mode + " · seed " + _engine.Seed + "\n" + string.Join("\n", _engine.CommandLog);
 
@@ -96,7 +93,7 @@ namespace ComboTactics.UI
 
             IBattleController side0 = new HumanController(this, _match.Mode == GameMode.LocalPvp);
             IBattleController side1 = _match.OpponentAi != null
-                ? (IBattleController)new SpecialAwareAiController(new RuleBasedAIController(_match.OpponentAi, _match.Setup.Seed + 17), () => _incomingSkill)
+                ? (IBattleController)new RuleBasedAIController(_match.OpponentAi, _match.Setup.Seed + 17)
                 : new HumanController(this, true);
             var director = new BattleDirector(_engine, side0, side1, this);
             _routine = App.Host.StartCoroutine(Coroutines.Guard(RunBattle(director), OnError));
@@ -118,29 +115,25 @@ namespace ComboTactics.UI
 
             yield return director.Run();
 
-            // Fim: paga as moedas, consome os itens usados, atualiza a campanha e salva (SYSTEM-DESIGN, Fluxo A).
+            // Fim: paga as moedas, consome os itens usados, atualiza campanha, HP da jornada, espectro e missões, e salva.
             var result = App.Services.Launcher.Finish(_match, _engine);
 
             if (_match.Mode == GameMode.Campaign)
             {
                 var chapter = CampaignStory.Chapter(_match.StageIndex);
-                if (_engine.WinnerSide == 0)
-                {
-                    CampaignStory.RecordStageVictoryState(
-                        _match.StageIndex,
-                        _engine.State.Sides[0].Team,
-                        App.Services.Profile.CampaignStage,
-                        App.Services.Content,
-                        App.Services.Economy,
-                        (id, st) => App.Services.Profile.UpgradeLevel(id, st));
-                }
                 yield return PlayStorySequence(_engine.WinnerSide == 0 ? chapter.VictoryDialogue : chapter.DefeatDialogue);
 
                 if (_engine.WinnerSide == 0 && result.CampaignCompleted)
                 {
-                    App.Show(new CutsceneScreen(CampaignStory.GetEpilogueCutscene(), 4, () => App.ShowResult(_match, result)));
+                    App.Show(new CutsceneScreen(CampaignStory.GetEpilogueCutscene(), CampaignStory.EpilogueCutsceneId, () => App.ShowResult(_match, result)));
                     yield break;
                 }
+            }
+            else if (_match.Mode == GameMode.Mission)
+            {
+                yield return PlayStorySequence(result.MissionCompleted
+                    ? CampaignStory.GetMissionVictory(_match.Mission)
+                    : CampaignStory.GetMissionDefeat(_match.Mission));
             }
 
             App.ShowResult(_match, result);
@@ -484,41 +477,5 @@ namespace ComboTactics.UI
         }
 
         /// <summary>Ajusta a reação da IA quando ela tenta defender um Golpe Especial (Super) ou quando há grande diferença de Velocidade.</summary>
-        private sealed class SpecialAwareAiController : IBattleController
-        {
-            private readonly RuleBasedAIController _inner;
-            private readonly Func<SkillSpec> _currentSkill;
-
-            public SpecialAwareAiController(RuleBasedAIController inner, Func<SkillSpec> currentSkill)
-            {
-                _inner = inner;
-                _currentSkill = currentSkill;
-            }
-
-            public void RequestAction(IBattleEngine engine, int side, Action<ICommand> reply)
-            {
-                _inner.RequestAction(engine, side, reply);
-            }
-
-            public void RequestReaction(IBattleEngine engine, int side, float windowSeconds, Action<ReactionResult> reply)
-            {
-                _inner.RequestReaction(engine, side, windowSeconds, raw =>
-                {
-                    var skill = _currentSkill();
-                    if (skill != null && skill.IsSpecial)
-                    {
-                        // Contra um Super, contra-ataque vira no máximo desvio, e desvios normais falham na maioria das vezes.
-                        if (raw == ReactionResult.Counter) raw = ReactionResult.Dodge;
-                        else if (raw == ReactionResult.Dodge) raw = ReactionResult.Miss;
-                    }
-                    reply(raw);
-                });
-            }
-
-            public void RequestForcedSwitch(IBattleEngine engine, int side, Action<int> reply)
-            {
-                _inner.RequestForcedSwitch(engine, side, reply);
-            }
-        }
     }
 }

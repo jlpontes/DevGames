@@ -28,6 +28,19 @@ namespace ComboTactics.Game
 
         public const string BossId = "boss_titan";
 
+        public const string GuardianFire = "guardian_fire";
+        public const string GuardianWater = "guardian_water";
+        public const string GuardianPlant = "guardian_plant";
+        public const string GuardianCore = "guardian_core";
+        public const string Echo = "echo";
+
+        /// <summary>
+        /// Bônus de atributos dos guardiões por fase. O R10 dizia +0 / +7 / +12%, mas com o espectro limitado e o HP
+        /// que persiste entre as fases isso travava as jornadas; os valores abaixo vêm da simulação da jornada
+        /// (CampaignSimulation): 1ª vitória em cerca de 85%, 55%, 45% e 50% das tentativas, nas quatro fases.
+        /// </summary>
+        public static readonly double[] StageBonus = { 0.00, 0.03, 0.03, 0.18 };
+
         public static ContentDatabase Create()
         {
             var effects = new List<EffectSpec>
@@ -103,12 +116,14 @@ namespace ComboTactics.Game
                 Skill("Casca Grossa", 85, DefenseUp, EffectTarget.Self, 1.0),
                 Special("Absorção Vital", 200, Poison, EffectTarget.Enemy));
 
-            // Boss (R9): lutador único, cerca de 3× o HP, sem elemento nem classe, lento o bastante para a Lua favorecê-lo.
-            AddCharacter(characters, skills, BossId, "Titã Lunar", "Campeão veterano da arena", Element.Neutral, CharClass.Neutral, 2600, 105, 50, 45,
+            // Guardião do Núcleo (R9): lutador único, cerca de 3× o HP, elemento neutro e classe Tanque (perde para Magos),
+            // lento o bastante para a Lua favorecê-lo. Abaixo de 50% de HP entra na segunda fase.
+            AddCharacter(characters, skills, BossId, "Ástreo", "Guardião do Núcleo, nascido do núcleo do cristal", Element.Neutral, CharClass.Tank, 2600, 105, 50, 45,
                 Skill("Golpe Gravitacional", 100),
-                Skill("Pulso Lunar", 85, AttackUp, EffectTarget.Self, 1.0),
-                Special("Eclipse Total", 200, DefenseUp, EffectTarget.Self),
-                false);
+                Skill("Pulso do Núcleo", 85, AttackUp, EffectTarget.Self, 1.0),
+                Special("Queda do Núcleo", 200, DefenseUp, EffectTarget.Self),
+                false,
+                new PhaseShiftSpec(0.50, new[] { AttackUp, DefenseUp }, true, "O núcleo desperta"));
 
             // Perfis de IA: tabela do ADR-004.
             var aiProfiles = new List<AIProfile>
@@ -116,34 +131,82 @@ namespace ComboTactics.Game
                 new AIProfile(Easy, "Fácil", 0.15, 0.30, 2, 0.20, 0.25, 0.30),
                 new AIProfile(Normal, "Normal", 0.20, 0.70, 2, 0.50, 0.25, 0.10),
                 new AIProfile(Hard, "Difícil", 0.30, 0.90, 2, 0.80, 0.35, 0.00),
-                new AIProfile("trainer_fire", "Treinador de Fogo", 0.20, 0.50, 2, 0.30, 0.25, 0.15),
-                new AIProfile("trainer_water", "Treinador de Água", 0.20, 0.70, 2, 0.40, 0.25, 0.10),
-                new AIProfile("trainer_plant", "Treinador de Planta", 0.25, 0.80, 2, 0.50, 0.30, 0.05),
-                new AIProfile("boss", "Boss", 0.00, 0.00, 2, 0.60, 0.40, 0.00),
+                new AIProfile(GuardianFire, "Ignis", 0.25, 0.65, 2, 0.35, 0.25, 0.05),
+                new AIProfile(GuardianWater, "Nereu", 0.28, 0.80, 2, 0.45, 0.30, 0.03),
+                new AIProfile(GuardianPlant, "Sylvan", 0.30, 0.85, 2, 0.48, 0.30, 0.02),
+                new AIProfile(GuardianCore, "Ástreo", 0.00, 0.00, 2, 0.45, 0.30, 0.00),
+                new AIProfile(Echo, "Eco do Cristal", 0.20, 0.60, 2, 0.40, 0.25, 0.05),
             };
 
-            // Campanha (R10): Fogo (+0%), Água (+7%), Planta (+12%), Boss.
+            // Campanha (R10): guardiões de Fogo, Água e Planta, depois o Guardião do Núcleo. Bônus de atributos por fase.
             var opponents = new List<OpponentDef>
             {
-                new OpponentDef("trainer_fire", "Treinador de Fogo", "Equipe de Fogo na arena Vulcão.",
-                    new[] { "fire_warrior", "fire_mage", "fire_tank" }, "trainer_fire", ArenaId.Volcano, 0.00,
+                new OpponentDef(GuardianFire, "Ignis, Guardião do Vulcão", "Os três lutadores do Fogo na arena Vulcão.",
+                    new[] { "fire_warrior", "fire_mage", "fire_tank" }, GuardianFire, ArenaId.Volcano, StageBonus[0],
                     new Dictionary<string, int> { { MedKit, 1 } }, 100),
-                new OpponentDef("trainer_water", "Treinador de Água", "Equipe de Água na arena Mar. Atributos +7%.",
-                    new[] { "water_warrior", "water_mage", "water_tank" }, "trainer_water", ArenaId.Sea, 0.07,
+                new OpponentDef(GuardianWater, "Nereu, Guardião do Mar", "Os três lutadores da Água na arena Mar.",
+                    new[] { "water_warrior", "water_mage", "water_tank" }, GuardianWater, ArenaId.Sea, StageBonus[1],
                     new Dictionary<string, int> { { MedKit, 1 }, { Medicine, 1 } }, 100),
-                new OpponentDef("trainer_plant", "Treinador de Planta", "Equipe de Planta na arena Floresta. Atributos +12%.",
-                    new[] { "plant_warrior", "plant_mage", "plant_tank" }, "trainer_plant", ArenaId.Forest, 0.12,
+                new OpponentDef(GuardianPlant, "Sylvan, Guardião da Floresta", "Os três lutadores da Planta na arena Floresta.",
+                    new[] { "plant_warrior", "plant_mage", "plant_tank" }, GuardianPlant, ArenaId.Forest, StageBonus[2],
                     new Dictionary<string, int> { { MedKit, 2 }, { Medicine, 1 } }, 100),
-                new OpponentDef("boss", "Boss Final", "Um único lutador exclusivo, com cerca de 3× o HP, na arena Lua.",
-                    new[] { BossId }, "boss", ArenaId.Moon, 0.00,
+                new OpponentDef(GuardianCore, "Ástreo, Guardião do Núcleo", "Um único lutador sem elemento, com cerca de 3× o HP, na Lua. Desperta abaixo de 50% de HP.",
+                    new[] { BossId }, GuardianCore, ArenaId.Moon, StageBonus[3],
                     new Dictionary<string, int> { { Medicine, 1 } }, 500),
             };
+
+            var missions = Missions();
 
             var fairKit = new Dictionary<string, int> { { MedKit, 1 }, { Medicine, 1 }, { AttackPotion, 1 } };
             var vsAiKit = new Dictionary<string, int> { { MedKit, 1 }, { Medicine, 1 } };
 
             return new ContentDatabase(characters, skills, effects, items, arenas, aiProfiles,
-                new[] { Easy, Normal, Hard }, opponents, fairKit, vsAiKit);
+                new[] { Easy, Normal, Hard }, opponents, fairKit, vsAiKit, missions);
+        }
+
+        /// <summary>
+        /// Missões secundárias ("Ecos do Cristal"), uma por lutador jogável, em três levas.
+        /// Cada leva traz um lutador com vantagem de elemento sobre o próximo guardião, para qualquer afinidade ter saída:
+        /// a 1ª (desde o início) tem o Guerreiro de Água contra o Vulcão; a 2ª, o Mago de Planta contra o Mar;
+        /// a 3ª, o Tanque de Fogo contra a Floresta.
+        /// </summary>
+        private static List<MissionDef> Missions()
+        {
+            return new List<MissionDef>
+            {
+                // Leva 1: disponível desde o início
+                new MissionDef("eco_water_warrior", "A Lâmina Desgarrada", "water_warrior", 0,
+                    "O tubarão-guerreiro foi parar na borda do Vulcão e só segue quem o vence num duelo limpo.",
+                    new[] { "water_warrior" }, 0.05, Echo, ArenaId.Volcano, true, 1, false, 0, false, 60, MedKit),
+                new MissionDef("eco_fire_mage", "A Fênix Impaciente", "fire_mage", 0,
+                    "A bruxa-fênix quer um mago que resolva a luta antes que as brasas esfriem.",
+                    new[] { "fire_mage", "fire_warrior" }, 0.00, Echo, ArenaId.Volcano, false, 3, true, 9, false, 60, AttackPotion),
+                new MissionDef("eco_plant_tank", "A Árvore que Não Cai", "plant_tank", 0,
+                    "Uma árvore antiga bloqueia a trilha e só abre caminho para quem a derruba sem perder ninguém.",
+                    new[] { "plant_tank" }, 0.60, Echo, ArenaId.Forest, true, 3, true, 0, true, 60, DefensePotion),
+
+                // Leva 2: depois do 1º guardião
+                new MissionDef("eco_fire_warrior", "Brasas na Areia", "fire_warrior", 1,
+                    "A mula sem cabeça e o dragão galopam pela praia. Alcance os dois sem usar a mochila.",
+                    new[] { "fire_warrior", "fire_tank" }, 0.10, Echo, ArenaId.Sea, false, 2, false, 0, false, 80, null),
+                new MissionDef("eco_plant_mage", "Esporos na Névoa", "plant_mage", 1,
+                    "Dentro da névoa do cogumelo-mago só existe a Floresta, e nenhuma poção funciona.",
+                    new[] { "plant_mage", "plant_warrior", "plant_tank" }, 0.00, Echo, ArenaId.Forest, true, 3, false, 0, false, 80, Medicine),
+                new MissionDef("eco_water_tank", "O Canto da Baleia", "water_tank", 1,
+                    "A baleia encalhada na Lua canta para quem a enfrenta, mas cansa se a luta demorar.",
+                    new[] { "water_tank" }, 0.25, Echo, ArenaId.Moon, true, 1, true, 14, false, 80, null),
+
+                // Leva 3: depois do 2º guardião
+                new MissionDef("eco_plant_warrior", "A Trilha do Curupira", "plant_warrior", 2,
+                    "O curupira e o cogumelo desviam os viajantes. Vença os dois sem itens para achar a trilha.",
+                    new[] { "plant_warrior", "plant_mage" }, 0.15, Echo, ArenaId.Forest, true, 2, false, 0, false, 100, null),
+                new MissionDef("eco_water_mage", "Marés Gêmeas", "water_mage", 2,
+                    "Duas imagens de Poseidon lutam juntas, uma delas feita de espuma. Descubra a verdadeira a tempo.",
+                    new[] { "water_mage", "water_warrior", "water_mage" }, 0.10, Echo, ArenaId.Sea, true, 3, true, 12, false, 100, null),
+                new MissionDef("eco_fire_tank", "O Coração do Dragão", "fire_tank", 2,
+                    "O dragão quer ver se o mago protege os seus lutadores. Vença-o sem perder ninguém.",
+                    new[] { "fire_tank" }, 0.90, Echo, ArenaId.Volcano, true, 3, true, 0, true, 100, MedKit),
+            };
         }
 
         private sealed class SkillTemplate
@@ -166,7 +229,7 @@ namespace ComboTactics.Game
         private static void AddCharacter(List<CharacterDef> characters, Dictionary<string, SkillSpec> skills,
             string id, string name, string appearance, Element element, CharClass charClass,
             int hp, int attack, int defense, int speed,
-            SkillTemplate first, SkillTemplate second, SkillTemplate special, bool playable = true)
+            SkillTemplate first, SkillTemplate second, SkillTemplate special, bool playable = true, PhaseShiftSpec phaseShift = null)
         {
             var templates = new[] { first, second, special };
             var ids = new string[templates.Length];
@@ -176,7 +239,7 @@ namespace ComboTactics.Game
                 ids[i] = id + "_skill" + (i + 1);
                 skills[ids[i]] = new SkillSpec(ids[i], t.Name, t.Power, t.IsSpecial, t.EffectId, t.Target, t.Chance);
             }
-            characters.Add(new CharacterDef(id, name, appearance, element, charClass, hp, attack, defense, speed, ids, playable));
+            characters.Add(new CharacterDef(id, name, appearance, element, charClass, hp, attack, defense, speed, ids, playable, phaseShift));
         }
     }
 }

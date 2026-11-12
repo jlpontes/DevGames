@@ -21,8 +21,12 @@ Para o build web: **File > Build Profiles > Web > Build**. O `ProjectSetup` já 
 | Janela de resposta (QTE) | Marcador cruza a barra; perfeito (±60 ms) = contra-ataque, bom (±150 ms) = desvio (R3). Clique ou Espaço |
 | Efeitos | Chamas, Afogamento, Veneno, Regeneração, Ataque +10%, Defesa +10%; 3 turnos; continuam no banco |
 | Arena | Começa na arena do oponente (campanha) ou sorteada; roleta a cada 3 rodadas (R4, R5) |
-| IA | Regras de prioridade do Level Design com os 7 perfis do ADR-004 |
-| Modos | Campanha (4 fases), contra IA (Fácil, Normal, Difícil), PvP local com "passe o aparelho" e Modo Justo (R6) |
+| IA | Regras de prioridade do Level Design, um perfil por dificuldade, guardião e missão; contra especiais a IA nunca contra-ataca |
+| Modo História | A história do Caderno: abertura, escolha da afinidade (R11), 3 guardiões e o Guardião do Núcleo com 2ª fase, cartões e falas em batalha (R12), epílogo |
+| Espectro (R11) | Começa com o trio da afinidade; cada guardião vencido traz o trio dele. Vale em todos os modos |
+| Missões (R13) | 9 "Ecos do Cristal" em três levas, com regras próprias; a primeira vitória recruta o lutador |
+| Jornada (R14) | HP que continua entre as fases, descanso de quem fica de fora, Altar de cura por moedas |
+| Modos | Campanha (4 fases), missões, contra IA (Fácil, Normal, Difícil), PvP local com "passe o aparelho" e Modo Justo (R6) |
 | Meta | Moedas (100 / 50 / 500), loja de itens, evoluções de +3% até 5 níveis, save local em dois slots |
 | Arte | Fundos de arena e menu do projeto; sprites dos 9 lutadores e do Boss em `Resources/Art/Characters`. Sem áudio |
 
@@ -35,7 +39,7 @@ Assets/_Project/
   Scenes/Boot.unity       cena vazia de entrada
   Scripts/
     Core/                 regras de batalha em C# puro (sem UnityEngine)      ComboTactics.Core
-    Game/                 conteúdo, perfil, loja, campanha, save (C# puro)    ComboTactics.Game
+    Game/                 conteúdo, roteiro, perfil, jornada, missões, loja, save (C# puro)    ComboTactics.Game
     Presentation/         telas, batalha, entrada do jogador (Unity)          ComboTactics.UI
     Editor/               configuração automática do projeto
     Tests/                testes EditMode e simulação de balanceamento
@@ -47,11 +51,11 @@ O fluxo de uma batalha: o `BattleDirector` pergunta aos controladores o que o mo
 
 ## Testes
 
-**Window > General > Test Runner > EditMode > Run All.** São 102 testes: fórmula de dano com os exemplos do GDD (135 e 29), regras R1–R10, cada regra da IA, loja, campanha, save e a simulação de balanceamento.
+**Window > General > Test Runner > EditMode > Run All.** São 133 testes: fórmula de dano com os exemplos do GDD (135 e 29), regras R1–R14, cada regra da IA, afinidade e espectro, missões, HP da jornada, 2ª fase do guardião, roteiro, loja, save (inclusive a migração da versão 1) e a simulação de balanceamento.
 
-O teste `PrintBalanceReport` roda milhares de batalhas IA contra IA e mostra a matriz 9×9 de duelos e a duração média das batalhas. Rode depois de mexer em atributos, habilidades ou perfis de IA.
+O teste `PrintBalanceReport` roda milhares de batalhas IA contra IA e mostra a matriz 9×9 de duelos, a duração média das batalhas e a jornada completa por afinidade (`CampaignSimulation`). Rode depois de mexer em atributos, habilidades, guardiões, missões ou perfis de IA.
 
-Situação da validação: o projeto abre e roda no Unity `6000.0.23f1` (conferido pelo time em 11/11/2026). `Core`, `Game` e os testes também compilam e passam fora do Unity (102 de 102), e a camada `Presentation` é exercitada por um roteiro automático sobre uma simulação da API do Unity (menu, loja, campanha, contra IA, PvP, desistência, diálogo de erro e save). Ainda falta um build WebGL testado nos navegadores.
+Situação da validação: o MVP abre e roda no Unity `6000.0.23f1` (conferido pelo time em 11/11/2026). `Core`, `Game` e os testes compilam e passam fora do Unity (133 de 133), e a camada `Presentation` é exercitada por um roteiro automático sobre uma simulação da API do Unity: abertura, escolha de afinidade, missão, Ato I, 2ª fase do Guardião do Núcleo, epílogo, contra IA com espectro, save e reset. As telas novas (afinidade e quadro de missões) ainda precisam ser vistas no editor. Ainda falta um build WebGL testado nos navegadores.
 
 ## Pontos de extensão
 
@@ -94,14 +98,12 @@ Estes números são pontos de partida escolhidos para o MVP e validados pela sim
 - **Equilíbrio dos 9 personagens:** com QTE de 50% para os dois lados, cada personagem vence entre 48% e 53% dos seus duelos. Nos 9 confrontos em que as vantagens se anulam (ex.: Guerreiro de Fogo contra Mago de Água), ninguém passa de 60%.
 - **Duração das batalhas 3v3** (média de rodadas): 28 sem QTE, 33 no Fácil, 45 no Normal, 62 no Difícil. O alerta do NEXT-STEPS é 40. O que alonga a partida é a chance de desvio, não o duelo de Tanques.
 - **O QTE decide quase tudo:** a IA Difícil (80% de acerto) vence a Fácil (20%) em quase todas as batalhas simuladas.
-- **Campanha** (IA Normal no lugar do jogador, equipe sorteada, sem evoluções): Fogo 89%, Água 58%, Planta 9%, Boss 20%. Com a equipe do elemento certo e evoluções, a Planta e o Boss ficam ao alcance.
+- **Jornada completa** (`CampaignSimulation`: um jogador médio com 55% de acerto no QTE, sem comprar evoluções, até 6 tentativas por fase): com as missões, mais de 90% das jornadas terminam com qualquer afinidade; a 1ª tentativa vence em cerca de 85%, 55%, 45% e 50% das vezes nas quatro fases. Sem missões, a afinidade Fogo termina só um terço das jornadas, porque o 2º guardião (Água) tem vantagem sobre todo o espectro inicial. As missões são o que abre caminho.
 
 ## Limitações conhecidas
 
-- **Faltam as regras novas do GDD de 20/10/2026:** afinidade e espectro (R11: o jogador começa só com os 3 lutadores de um elemento e libera os outros na campanha) e os cartões de história (R12). Os oponentes ainda se chamam "Treinador" e "Boss Final", não "Guardião". O Boss está sem classe; pela R9 nova ele é neutro só no elemento.
-- **Origem dos sprites:** os sprites dos lutadores foram recortados de imagens de referência reunidas pelo time, e parte delas é arte de terceiros (algumas com assinatura de artista). Servem como provisórios; antes de publicar o jogo, troquem por arte própria ou licenciada.
-- O Tanque de Água está com um sprite de tubarão; pelo GDD ele é uma baleia.
-- Alguns sprites olham para a esquerda; o da direita é sempre espelhado, então nem todos ficam de frente para o oponente.
+- **Origem da arte:** a arte foi refeita em 11/11/2026 usando as referências só como inspiração. O Mago de Planta ainda lembra bastante uma das referências (chapéu de cogumelo e túnica verde); vale uma revisão antes de publicar.
+- Textos com símbolos (★, ▶, ⚡) usam a fonte padrão do Unity; no WebGL, que não tem fontes do sistema para cair de volta, eles podem aparecer como quadrados. Conferir no primeiro build web.
 - Sem áudio.
 - Sem build WebGL testado ainda.
 - Evolução de 3% sobre um atributo baixo pode não mudar o valor: a Defesa 15 do Mago de Fogo continua 15 no nível 1.
@@ -114,7 +116,6 @@ Estes números são pontos de partida escolhidos para o MVP e validados pela sim
 Técnicas:
 
 - Publicar um build WebGL de teste no itch.io e conferir no Chrome, Firefox e Safari.
-- Implementar afinidade e espectro (R11) e os cartões de história (R12).
 - Pipeline de CI (GameCI) rodando os testes EditMode e gerando o build a cada push.
 - Conteúdo em ScriptableObjects com validação no editor (ADR-003).
 - Áudio e VFX ligados ao `BattleDirector.EventPlayed`; arte própria e animações dos lutadores.
@@ -126,5 +127,6 @@ De jogo e negócio:
 
 - Rever o peso do QTE: reduzir as chances da IA, limitar o desvio a parte do dano, ou encurtar as janelas. É o maior fator de duração e de dificuldade.
 - Level design das fases de Fogo, Planta e Boss, e atributos finais do Boss.
+- Mais missões (uma segunda rodada de ecos depois do epílogo) e conquistas por missão cumprida com objetivos extras.
 - Playtest com pessoas de fora do time para calibrar os tempos do QTE e os preços da loja.
 - Depois do MVP: sistema de apostas, PvP online e save na nuvem (pedem backend; o motor determinístico com seed já permite validar batalhas no servidor).

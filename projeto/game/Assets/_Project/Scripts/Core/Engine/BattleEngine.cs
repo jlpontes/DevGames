@@ -22,6 +22,7 @@ namespace ComboTactics.Core
         public BattleCatalog Catalog { get; private set; }
         public PendingKind Pending { get; private set; }
         public int PendingSide { get; private set; }
+        public SkillSpec PendingSkill { get { return Pending == PendingKind.Reaction ? _pendingSkill : null; } }
         public bool IsOver { get; private set; }
         public int WinnerSide { get; private set; }
         public int Seed { get; private set; }
@@ -49,7 +50,16 @@ namespace ComboTactics.Core
             if (specs == null || specs.Count < 1 || specs.Count > Rules.MaxTeamSize)
                 throw new ArgumentException("A equipe " + index + " precisa ter de 1 a " + Rules.MaxTeamSize + " lutadores.");
             var team = new Fighter[specs.Count];
-            for (int i = 0; i < specs.Count; i++) team[i] = new Fighter(specs[i]);
+            var startingHp = setup.StartingHp[index];
+            if (startingHp != null && startingHp.Count != specs.Count)
+                throw new ArgumentException("O HP inicial do lado " + index + " precisa de um valor por lutador.");
+            for (int i = 0; i < specs.Count; i++)
+            {
+                team[i] = new Fighter(specs[i]);
+                if (startingHp == null) continue;
+                if (startingHp[i] <= 0) throw new ArgumentException("Lutador sem HP não pode entrar na batalha: " + specs[i].Id);
+                team[i].Hp = Math.Min(startingHp[i], specs[i].MaxHp);
+            }
 
             var items = new Dictionary<string, int>();
             int total = 0;
@@ -312,6 +322,7 @@ namespace ComboTactics.Core
             AddStamina(targetSide, Rules.StaminaOnTakeDamage, events);
 
             if (defender.IsFainted) Faint(targetSide, target.ActiveIndex, events);
+            else CheckPhaseShift(targetSide, target.ActiveIndex, events);
 
             if (skill.EffectId != null && _rng.Chance(skill.EffectChance))
             {
@@ -323,6 +334,21 @@ namespace ComboTactics.Core
                         onSelf ? dealer.ActiveIndex : target.ActiveIndex, Catalog.Effects[skill.EffectId], events);
                 }
             }
+        }
+
+        /// <summary>Ativa a segunda fase do lutador (uma vez por batalha) quando o HP cai até o limite.</summary>
+        private void CheckPhaseShift(int sideIndex, int fighterIndex, List<BattleEvent> events)
+        {
+            var fighter = State.Sides[sideIndex].Team[fighterIndex];
+            var phase = fighter.Spec.PhaseShift;
+            if (phase == null || fighter.PhaseShifted || fighter.IsFainted) return;
+            if (fighter.Hp > fighter.Spec.MaxHp * phase.HpFraction) return;
+
+            fighter.PhaseShifted = true;
+            events.Add(new PhaseShifted(sideIndex, fighterIndex, phase.Title));
+            for (int i = 0; i < phase.EffectIds.Count; i++)
+                ApplyEffect(fighter, sideIndex, fighterIndex, Catalog.Effects[phase.EffectIds[i]], events);
+            if (phase.FillsStamina) AddStamina(sideIndex, Rules.StaminaMax, events);
         }
 
         private void ApplyEffect(Fighter source, int sideIndex, int fighterIndex, EffectSpec spec, List<BattleEvent> events)
@@ -364,6 +390,8 @@ namespace ComboTactics.Core
                     for (int e = 0; e < effects.Length && !fighter.IsFainted; e++)
                     {
                         var effect = effects[e];
+                        // A segunda fase pode ter renovado um efeito durante este laço; a cópia antiga não conta mais.
+                        if (!fighter.Effects.Contains(effect)) continue;
                         int delta = 0;
                         if (effect.Spec.Kind == EffectKind.DamageOverTime)
                         {
@@ -381,12 +409,14 @@ namespace ComboTactics.Core
                         if (fighter.IsFainted)
                         {
                             Faint(s, f, events);
+                            continue;
                         }
-                        else if (effect.TurnsLeft <= 0)
+                        if (effect.TurnsLeft <= 0)
                         {
                             fighter.Effects.Remove(effect);
                             events.Add(new EffectExpired(s, f, effect.Spec));
                         }
+                        if (delta < 0) CheckPhaseShift(s, f, events);
                     }
                 }
             }

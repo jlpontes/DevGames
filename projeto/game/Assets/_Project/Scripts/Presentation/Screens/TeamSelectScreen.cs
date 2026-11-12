@@ -7,9 +7,8 @@ using UnityEngine;
 namespace ComboTactics.UI
 {
     /// <summary>
-    /// Seleção de Personagens / Acampamento do Invocador:
-    /// No Modo História mostra os Elementares despertados no Grimório, o HP persistente de cada um,
-    /// o Altar de Cura com moedas e a preparação de itens antes de entrar na arena.
+    /// Seleção de equipe. Em todos os modos só entram lutadores do espectro do mago (R11).
+    /// Na campanha mostra o HP da jornada e o Altar; nas missões, o tamanho da equipe e as regras da missão.
     /// </summary>
     public sealed class TeamSelectScreen : UiScreen
     {
@@ -25,43 +24,42 @@ namespace ComboTactics.UI
         private List<string> Team { get { return _player == 0 ? _request.Team : _request.Team2; } }
         private bool IsPvp { get { return _request.Mode == GameMode.LocalPvp; } }
         private bool IsCampaign { get { return _request.Mode == GameMode.Campaign; } }
+        private bool IsMission { get { return _request.Mode == GameMode.Mission; } }
+        private int TeamSize { get { return App.Services.Launcher.RequiredTeamSize(_request); } }
 
         protected override void Build()
         {
             var services = App.Services;
             var content = services.Content;
-            int teamSize = services.Rules.MaxTeamSize;
+            int teamSize = TeamSize;
             bool useUpgrades = !IsPvp || !services.Profile.FairPvp;
 
-            // Na Campanha, verifica quais Elementares já foram despertados no Grimório e remove da seleção quem estiver sem HP ou selado.
+            // Só o espectro entra (R11). Na campanha, quem está exausto (0 HP da jornada) também fica de fora.
             int grimoireProgress = Mathf.Max(services.Profile.CampaignStage, _request.StageIndex);
-            var unlockedSet = IsCampaign ? CampaignStory.GetUnlockedElementals(grimoireProgress) : null;
-            if (IsCampaign)
-            {
-                Team.RemoveAll(id =>
-                {
-                    if (!unlockedSet.Contains(id)) return true;
-                    var def = content.Character(id);
-                    var sp = StatsResolver.ForPlayer(def, content, services.Economy, st => services.Profile.UpgradeLevel(id, st));
-                    return CampaignStory.GetPersistentHp(id, sp.MaxHp) <= 0;
-                });
-            }
+            var unlockedSet = CampaignStory.GetUnlockedElementals(grimoireProgress);
+            Team.RemoveAll(id => !unlockedSet.Contains(id) || (IsCampaign && services.Journey.IsExhausted(id)));
+            while (Team.Count > teamSize) Team.RemoveAt(Team.Count - 1);
 
             Texture backdropArt = IsCampaign
                 ? Art.Arena(services.Campaign.Stages[_request.StageIndex].HomeArena)
                 : null;
             Ui.Backdrop(Root, backdropArt, 0.30f);
 
+            var mission = IsMission ? content.Mission(_request.MissionId) : null;
             string title = IsPvp
                 ? "Equipe " + (_player + 1) + " — Jogador " + (_player + 1)
                 : IsCampaign
-                    ? CampaignStory.Chapter(_request.StageIndex).ActTitle + " · Espectro do Mago"
-                    : "Seleção de Personagens";
+                    ? CampaignStory.Chapter(_request.StageIndex).ActTitle + " · Escolha a equipe"
+                    : IsMission
+                        ? "Missão · " + mission.Title
+                        : "Seleção de Personagens";
             Ui.Label(Root, title, 30, 10, 780, 40, 30, Theme.Gold, TextAnchor.MiddleLeft, FontStyle.Bold, true);
 
             string sub = IsCampaign
-                ? "O Mago: escolha 3 lendas vivas do seu Espectro. Quem descansar recupera +50% HP ao vencer a fase!"
-                : "Escolha " + teamSize + " lutadores para a arena. O 1º escolhido inicia o combate.";
+                ? "Escolha 3 lutadores de pé. O dano continua na próxima fase; quem fica de fora recupera 50% do HP se você vencer."
+                : IsMission
+                    ? string.Join("  ·  ", mission.RuleTexts().ToArray())
+                    : "Escolha " + teamSize + " lutadores do seu espectro. O 1º escolhido inicia o combate.";
             Ui.Label(Root, sub, 30, 48, 790, 24, 14, Theme.Text, TextAnchor.MiddleLeft, FontStyle.Bold);
 
             if (IsCampaign)
@@ -79,7 +77,7 @@ namespace ComboTactics.UI
                 var spec = StatsResolver.ForPlayer(def, content, services.Economy,
                     useUpgrades ? (Func<Stat, int>)(stat => services.Profile.UpgradeLevel(id, stat)) : null);
                 int order = Team.IndexOf(def.Id);
-                bool unlocked = !IsCampaign || unlockedSet.Contains(id);
+                bool unlocked = unlockedSet.Contains(id);
                 int currentHp = IsCampaign ? CampaignStory.GetPersistentHp(id, spec.MaxHp) : spec.MaxHp;
                 DrawCard(spec, def, 30 + (i % 3) * 274, 80 + (i / 3) * 174, order, unlocked, currentHp);
             }
@@ -87,7 +85,7 @@ namespace ComboTactics.UI
             // Painel da direita: resumo, oponente, itens e botões.
             var side = Ui.Frame(Root, "Side", 856, 80, 394, 524, Theme.Panel, Theme.BorderGold, 2f);
             float y = 10;
-            Ui.Label(side, "CÍRCULO DE INVOCAÇÃO (" + Team.Count + "/" + teamSize + ")", 16, y, 362, 24, 17, Theme.Gold, TextAnchor.MiddleLeft, FontStyle.Bold);
+            Ui.Label(side, "EQUIPE (" + Team.Count + "/" + teamSize + ")", 16, y, 362, 24, 17, Theme.Gold, TextAnchor.MiddleLeft, FontStyle.Bold);
             y += 28;
             for (int i = 0; i < teamSize; i++)
             {
@@ -101,13 +99,13 @@ namespace ComboTactics.UI
                         useUpgrades ? (Func<Stat, int>)(stat => services.Profile.UpgradeLevel(member.Id, stat)) : null);
                     int mHp = IsCampaign ? CampaignStory.GetPersistentHp(member.Id, mSpec.MaxHp) : mSpec.MaxHp;
                     Ui.Picture(slot, "Mini", Art.Fighter(member.Id, member.Element, member.Class), 6, 3, 28, 28);
-                    string role = i == 0 ? "1º (Líder)" : (i + 1) + "º (Reserva)";
+                    string role = i == 0 ? "1º (começa)" : (i + 1) + "º (reserva)";
                     Ui.Label(slot, role + " — " + member.Name + " (" + mHp + "/" + mSpec.MaxHp + " HP)",
                         40, 0, 314, 34, 14, Theme.Text, TextAnchor.MiddleLeft, FontStyle.Bold);
                 }
                 else
                 {
-                    Ui.Label(slot, (i + 1) + "º Vaga de invocação aberta", 12, 0, 338, 34, 14, Theme.Muted, TextAnchor.MiddleLeft);
+                    Ui.Label(slot, (i + 1) + "º lugar livre", 12, 0, 338, 34, 14, Theme.Muted, TextAnchor.MiddleLeft);
                 }
                 y += 38;
             }
@@ -121,6 +119,12 @@ namespace ComboTactics.UI
             {
                 Ui.Label(side, "SUPRIMENTOS DE ARENA", 16, y, 362, 26, 17, Theme.Gold, TextAnchor.MiddleLeft, FontStyle.Bold);
                 Ui.Label(side, "Kit fixo do PvP: 1 Kit Médico, 1 Remédio e 1 Poção de Ataque.", 16, y + 28, 362, 50, 15, Theme.Muted, TextAnchor.UpperLeft);
+            }
+            else if (!services.Launcher.ItemsAllowed(_request))
+            {
+                _request.Items.Clear();
+                Ui.Label(side, "MOCHILA", 16, y, 362, 26, 17, Theme.Gold, TextAnchor.MiddleLeft, FontStyle.Bold);
+                Ui.Label(side, "Esta missão não permite itens.", 16, y + 28, 362, 50, 15, Theme.Muted, TextAnchor.UpperLeft);
             }
             else
             {
@@ -148,13 +152,13 @@ namespace ComboTactics.UI
 
             if (IsCampaign)
             {
-                Ui.Button(Root, "🎬 Rever Cutscene", 212, 620, 196, 60,
+                Ui.Button(Root, "Rever a cena", 212, 620, 196, 60,
                     () => App.PlayCampaignStage(_request.StageIndex, true), Theme.Button, 16);
 
                 bool anyDamaged = CampaignStory.HasAnyDamagedElemental(grimoireProgress, content, services.Economy,
                     (id, st) => services.Profile.UpgradeLevel(id, st));
                 var healAllBtn = Ui.Button(Root,
-                    "✦ Altar: Curar Todos (" + CampaignStory.HealAllCost + "m)",
+                    "Altar: curar todos (" + CampaignStory.HealAllCost + " moedas)",
                     422, 620, 272, 60, HealAllInSanctuary,
                     anyDamaged ? new Color(0.16f, 0.36f, 0.24f, 0.96f) : Theme.Button, 16);
                 healAllBtn.interactable = anyDamaged;
@@ -163,7 +167,7 @@ namespace ComboTactics.UI
             }
 
             bool ready = Team.Count == teamSize;
-            string confirmLabel = IsPvp && _player == 0 ? "Próximo: Equipe 2" : "Invocar na Arena! ⚔";
+            string confirmLabel = IsPvp && _player == 0 ? "Próximo: Equipe 2" : "Para a arena!";
             var confirm = Ui.Button(Root, confirmLabel, 920, 616, 330, 68, Confirm, ready ? Theme.ButtonPrimary : Theme.Button, 24);
             confirm.interactable = ready;
         }
@@ -194,7 +198,7 @@ namespace ComboTactics.UI
             if (!Art.HasSprite(def.Id))
                 Ui.Label(portrait, Theme.ClassLetter(def.Class), 0, 0, 68, 68, 28, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold, true);
 
-            Ui.Label(t, isUnlocked ? def.Name : "??? (Espírito Selado)", 86, 8, 170, 24, 17,
+            Ui.Label(t, def.Name, 86, 8, 170, 24, 17,
                 !isUnlocked || isExhausted ? Theme.Muted : Theme.Text, TextAnchor.MiddleLeft, FontStyle.Bold, true);
             Ui.Label(t, Theme.ElementName(def.Element) + " · " + Theme.ClassName(def.Class), 86, 30, 170, 20, 13, elemColor, TextAnchor.MiddleLeft, FontStyle.Bold);
 
@@ -217,16 +221,15 @@ namespace ComboTactics.UI
 
             if (!isUnlocked)
             {
-                int actNum = CampaignStory.GetUnlockChapterNumber(def.Id);
-                var lockBanner = Ui.Frame(t, "LockBanner", 8, 124, 246, 30, new Color(0.08f, 0.06f, 0.14f, 0.96f), Theme.BorderGold, 1.5f);
-                Ui.Label(lockBanner, "🔒 UNE-SE AO ESPECTRO NA FASE " + actNum, 4, 0, 234, 26, 11, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold);
+                var lockBanner = Ui.Frame(t, "LockBanner", 8, 122, 246, 34, new Color(0.08f, 0.06f, 0.14f, 0.96f), Theme.BorderGold, 1.5f);
+                Ui.Label(lockBanner, "FORA DO ESPECTRO · " + CampaignStory.GetUnlockHint(def.Id), 4, 0, 238, 30, 10, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold);
             }
             else if (IsCampaign && isDamaged)
             {
                 string id = def.Id;
                 string healText = isExhausted
-                    ? "EXAUSTO · Curar (" + CampaignStory.HealSingleCost + "m)"
-                    : "✦ Curar 100% (" + CampaignStory.HealSingleCost + "m)";
+                    ? "EXAUSTO · curar (" + CampaignStory.HealSingleCost + " moedas)"
+                    : "Curar 100% (" + CampaignStory.HealSingleCost + " moedas)";
                 Ui.Button(t, healText, 10, 134, 242, 24, () => HealSingleInSanctuary(id, def.Name),
                     isExhausted ? Theme.ButtonDanger : new Color(0.16f, 0.36f, 0.24f, 0.95f), 11);
             }
@@ -247,7 +250,7 @@ namespace ComboTactics.UI
             }
             App.Services.Profile.Save();
             CampaignStory.HealElementalFull(charId);
-            App.Notify(charName + " teve 100% do HP restaurado pelo Altar do Grimório!");
+            App.Notify(charName + " voltou a 100% de HP no Altar.");
             Rebuild();
         }
 
@@ -260,7 +263,7 @@ namespace ComboTactics.UI
             }
             App.Services.Profile.Save();
             CampaignStory.HealAllElementals();
-            App.Notify("Todos os Elementares do seu Grimório foram 100% restaurados!");
+            App.Notify("Todo o espectro voltou a 100% de HP.");
             Rebuild();
         }
 
@@ -272,12 +275,24 @@ namespace ComboTactics.UI
                 var opponent = services.Campaign.Stages[_request.StageIndex];
                 var chapter = CampaignStory.Chapter(_request.StageIndex);
                 var arena = services.Content.Catalog.Arenas[opponent.HomeArena];
-                string bonus = _request.StageIndex == 3
-                    ? "Boss 2 Fases (Desperta <50% HP)"
-                    : "Atributos +" + Mathf.RoundToInt((float)chapter.ChallengingStatBonus * 100f) + "%";
+                string bonus = (chapter.ChallengingStatBonus > 0 ? "atributos +" + Mathf.RoundToInt((float)chapter.ChallengingStatBonus * 100f) + "%" : "atributos base")
+                    + (opponent.UnlocksElement == Element.Neutral ? " · 2ª fase abaixo de 50% de HP" : "");
                 return "Guardião: " + chapter.MasterName + " (" + bonus + ")\n" +
-                       "Zona: " + arena.Name + " (" + Theme.ArenaEffect(arena, services.Rules) + ")\n" +
-                       "Dano Persistente: o HP final fica salvo; reservas no Espectro curam +50% HP!";
+                       "Arena: " + arena.Name + " (" + Theme.ArenaEffect(arena, services.Rules) + ")\n" +
+                       "O HP final fica salvo para a próxima fase.";
+            }
+            if (IsMission)
+            {
+                var mission = services.Content.Mission(_request.MissionId);
+                var arena = services.Content.Catalog.Arenas[mission.Arena];
+                var enemies = new List<string>();
+                foreach (var id in mission.EnemyTeamIds) enemies.Add(services.Content.Character(id).Name);
+                string reward = services.Missions.RecruitPending(mission)
+                    ? "Recompensa: " + services.Content.Character(mission.RecruitId).Name + " no espectro"
+                    : "Recompensa: moedas";
+                return "Oponentes: " + string.Join(", ", enemies.ToArray()) +
+                       (mission.EnemyStatBonus > 0 ? " (+" + Mathf.RoundToInt((float)mission.EnemyStatBonus * 100f) + "%)" : "") + "\n" +
+                       "Arena: " + arena.Name + (mission.FixedArena ? " (fixa)" : "") + "\n" + reward;
             }
             if (_request.Mode == GameMode.VsAi)
                 return "Oponente: IA " + services.Content.AiProfiles[_request.DifficultyId].Name + "\nEquipe e arena inicial sorteadas.";
@@ -289,18 +304,17 @@ namespace ComboTactics.UI
         {
             if (!isUnlocked)
             {
-                int actNum = CampaignStory.GetUnlockChapterNumber(id);
-                App.Notify("Este Espírito Elemental ainda está selado! Avance até o Ato " + actNum + " para despertá-lo no Grimório.");
+                App.Notify("Fora do espectro. " + CampaignStory.GetUnlockHint(id) + ".");
                 return;
             }
             if (isExhausted)
             {
-                App.Notify("Este Elementar está com 0 HP! Deixe-o descansar por 1 vitória (+50% HP) ou cure-o no Altar.");
+                App.Notify("Este lutador está com 0 HP. Deixe-o descansar numa vitória (+50% HP) ou cure-o no Altar.");
                 return;
             }
             if (Team.Contains(id)) Team.Remove(id);
-            else if (Team.Count < App.Services.Rules.MaxTeamSize) Team.Add(id);
-            else App.Notify("A equipe já tem " + App.Services.Rules.MaxTeamSize + " lutadores. Clique em um deles para tirar.");
+            else if (Team.Count < TeamSize) Team.Add(id);
+            else App.Notify("A equipe já tem " + TeamSize + (TeamSize == 1 ? " lutador" : " lutadores") + ". Clique em um deles para tirar.");
             Rebuild();
         }
 
@@ -330,6 +344,7 @@ namespace ComboTactics.UI
             if (IsPvp && _player == 1) App.ShowTeamSelect(_request, 0);
             else if (_request.Mode == GameMode.VsAi) App.ShowVsAi();
             else if (IsPvp) App.ShowPvp();
+            else if (IsMission) App.ShowMissions();
             else App.ShowCampaign();
         }
 

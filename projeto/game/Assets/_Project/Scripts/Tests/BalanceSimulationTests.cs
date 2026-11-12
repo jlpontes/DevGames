@@ -111,6 +111,34 @@ namespace ComboTactics.Tests
         }
 
         [Test]
+        public void EveryAffinityCanFinishTheJourney()
+        {
+            // Jogador médio (QTE 55%), sem comprar evoluções, até 6 tentativas por fase e fazendo as missões.
+            foreach (var affinity in new[] { Element.Fire, Element.Water, Element.Plant })
+            {
+                int completed = 0;
+                const int runs = 40;
+                for (int i = 0; i < runs; i++)
+                    if (CampaignSimulation.Play(affinity, CampaignSimulation.TypicalPlayer(), true, 900 + i).Completed) completed++;
+                Assert.That(completed / (double)runs, Is.GreaterThanOrEqualTo(0.80), "afinidade " + affinity);
+            }
+        }
+
+        [Test]
+        public void SideMissionsMakeAHardAffinityEasier()
+        {
+            // Com Fogo, o 2º guardião (Água) tem vantagem sobre todo o espectro inicial: as missões precisam fazer diferença.
+            int with = 0, without = 0;
+            const int runs = 40;
+            for (int i = 0; i < runs; i++)
+            {
+                if (CampaignSimulation.Play(Element.Fire, CampaignSimulation.TypicalPlayer(), true, 1200 + i).Completed) with++;
+                if (CampaignSimulation.Play(Element.Fire, CampaignSimulation.TypicalPlayer(), false, 1200 + i).Completed) without++;
+            }
+            Assert.That(with, Is.GreaterThan(without + runs / 4));
+        }
+
+        [Test]
         public void PrintBalanceReport()
         {
             var sb = new StringBuilder();
@@ -132,6 +160,9 @@ namespace ComboTactics.Tests
                 }
                 sb.AppendLine();
             }
+            sb.AppendLine();
+            sb.AppendLine(CampaignSimulation.Report(CampaignSimulation.TypicalPlayer(), true, 60));
+            sb.AppendLine(CampaignSimulation.Report(CampaignSimulation.TypicalPlayer(), false, 60));
             // Assert.Pass leva o relatório para o painel de detalhes do Test Runner do Unity.
             Assert.Pass(sb.ToString());
         }

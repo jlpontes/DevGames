@@ -13,6 +13,7 @@ namespace ComboTactics.Core
             public FighterSpec Spec;
             public int Hp;
             public bool Fainted;
+            public bool PhaseShifted;
             /// <summary>Id do efeito → turnos restantes.</summary>
             public readonly Dictionary<string, int> Effects = new Dictionary<string, int>();
         }
@@ -45,7 +46,7 @@ namespace ComboTactics.Core
                 for (int f = 0; f < side.Team.Length; f++)
                 {
                     var fighter = side.Team[f];
-                    var fv = new FighterView { Spec = fighter.Spec, Hp = fighter.Hp, Fainted = fighter.IsFainted };
+                    var fv = new FighterView { Spec = fighter.Spec, Hp = fighter.Hp, Fainted = fighter.IsFainted, PhaseShifted = fighter.PhaseShifted };
                     foreach (var effect in fighter.Effects) fv.Effects[effect.Spec.Id] = effect.TurnsLeft;
                     view.Team[f] = fv;
                 }
@@ -109,6 +110,9 @@ namespace ComboTactics.Core
                 fighter.Effects.Clear();
                 return;
             }
+
+            var phase = ev as PhaseShifted;
+            if (phase != null) { Sides[phase.Side].Team[phase.FighterIndex].PhaseShifted = true; return; }
 
             var arena = ev as ArenaChanged;
             if (arena != null) { Arena = arena.Arena; return; }

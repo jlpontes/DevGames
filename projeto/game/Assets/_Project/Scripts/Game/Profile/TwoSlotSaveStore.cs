@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 
 namespace ComboTactics.Game
@@ -96,9 +97,19 @@ namespace ComboTactics.Game
             }
         }
 
-        /// <summary>Gancho de migração: quando o formato mudar, converta aqui as versões antigas, uma por vez.</summary>
+        /// <summary>Converte versões antigas, uma por vez.</summary>
         private static SaveData Migrate(SaveData data)
         {
+            if (data.version < 2)
+            {
+                // v1 → v2: campos novos começam vazios. A afinidade será escolhida ao abrir o Modo História;
+                // os guardiões já vencidos continuam liberando os seus lutadores, porque o espectro é calculado.
+                data.affinity = "";
+                data.recruits = new List<string>();
+                data.journeyHp = new List<HpEntry>();
+                data.seenStory = new List<string>();
+                data.missionsDone = new List<string>();
+            }
             data.version = SaveData.CurrentVersion;
             return data;
         }
