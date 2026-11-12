@@ -118,7 +118,7 @@ namespace ComboTactics.Game
 
             // Guardião do Núcleo (R9): lutador único, cerca de 3× o HP, elemento neutro e classe Tanque (perde para Magos),
             // lento o bastante para a Lua favorecê-lo. Abaixo de 50% de HP entra na segunda fase.
-            AddCharacter(characters, skills, BossId, "Ástreo, Guardião do Núcleo", "Criatura nascida do núcleo do cristal", Element.Neutral, CharClass.Tank, 2600, 105, 50, 45,
+            AddCharacter(characters, skills, BossId, "Ástreo", "Guardião do Núcleo, nascido do núcleo do cristal", Element.Neutral, CharClass.Tank, 2600, 105, 50, 45,
                 Skill("Golpe Gravitacional", 100),
                 Skill("Pulso do Núcleo", 85, AttackUp, EffectTarget.Self, 1.0),
                 Special("Queda do Núcleo", 200, DefenseUp, EffectTarget.Self),

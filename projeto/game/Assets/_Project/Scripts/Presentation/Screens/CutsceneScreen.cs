@@ -17,6 +17,7 @@ namespace ComboTactics.UI
         private readonly int _cutsceneId;
         private readonly Action _onComplete;
         private int _index;
+        private bool _finished;
         private Coroutine _animRoutine;
 
         public CutsceneScreen(CutsceneSlide[] slides, int cutsceneId, Action onComplete)
@@ -52,11 +53,11 @@ namespace ComboTactics.UI
             Ui.Box(Root, "TopBar", 0, 0, Theme.Width, 64, new Color(0.03f, 0.02f, 0.05f, 0.92f));
             Ui.Box(Root, "TopDivider", 0, 64, Theme.Width, 2, accent);
 
-            Ui.Label(Root, "CRÔNICAS DO ECLIPSE  ·  CENA " + (_index + 1) + " DE " + _slides.Length,
+            Ui.Label(Root, "CRÔNICAS DO CRISTAL  ·  CENA " + (_index + 1) + " DE " + _slides.Length,
                 32, 14, 340, 36, 15, Theme.Muted, TextAnchor.MiddleLeft, FontStyle.Bold);
             Ui.Label(Root, slide.HeaderTitle,
                 340, 10, 600, 44, 24, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold, true);
-            Ui.Button(Root, "Pular Cutscene ⏭", 1068, 12, 180, 40, FinishCutscene, Theme.Button, 15);
+            Ui.Button(Root, "Pular", 1068, 12, 180, 40, FinishCutscene, Theme.Button, 15);
 
             // 2. Palco central: Ritual de Invocação dos Elementares OU Confronto de Personagens
             var stage = Ui.Node(Root, "StageArea", 0, 68, Theme.Width, 370);
@@ -70,15 +71,15 @@ namespace ComboTactics.UI
 
             var summonerCard = Ui.Frame(stage, "SummonerFrame", 116, 78, 180, 214, new Color(0.08f, 0.05f, 0.14f, 0.94f), Theme.Gold, 2.5f);
             Ui.Picture(summonerCard, "SummonerArt", Art.Fighter(Art.SummonerId, Element.Neutral, CharClass.Mage), 16, 10, 144, 144);
-            Ui.Label(summonerCard, "VOCÊ (INVOCADOR)", 6, 156, 164, 22, 13, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold);
-            Ui.Label(summonerCard, "Grimório Astral", 6, 178, 164, 20, 12, Theme.Muted, TextAnchor.MiddleCenter);
+            Ui.Label(summonerCard, CampaignStory.SummonerName.ToUpperInvariant() + " (VOCÊ)", 6, 156, 164, 22, 13, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold);
+            Ui.Label(summonerCard, CampaignStory.SummonerTitle, 6, 178, 164, 20, 12, Theme.Muted, TextAnchor.MiddleCenter);
             animatedPortraits.Add((RectTransform)summonerCard.parent);
 
             if (slide.SummonedElementals != null && slide.SummonedElementals.Length > 0)
             {
                 // Cena de Pacto Elemental: mostra os 3 guerreiros sendo despertados pelo Grimório!
                 var pactBanner = Ui.Frame(stage, "PactBanner", 376, 12, 840, 42, new Color(0.07f, 0.05f, 0.12f, 0.92f), Theme.Gold, 1.5f);
-                Ui.Label(pactBanner, "✦ RITUAL DO GRIMÓRIO: NOVOS ESPÍRITOS ELEMENTARES DESPERTADOS! ✦",
+                Ui.Label(pactBanner, "LUTADORES NO ESPECTRO DE " + CampaignStory.SummonerName.ToUpperInvariant(),
                     10, 0, 816, 38, 17, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold, true);
 
                 for (int i = 0; i < slide.SummonedElementals.Length; i++)
@@ -97,13 +98,13 @@ namespace ComboTactics.UI
 
                     var card = Ui.Frame(stage, "ElemCard" + i, cx + 14, 66, 240, 256, new Color(0.06f, 0.06f, 0.10f, 0.95f), elemCol, 2.5f);
                     var badge = Ui.Box(card, "NewBadge", 10, 8, 216, 24, new Color(elemCol.r * 0.28f, elemCol.g * 0.28f, elemCol.b * 0.28f, 0.95f));
-                    Ui.Label(badge.transform, "★ PACTO CONCLUÍDO", 0, 0, 216, 24, 12, elemCol, TextAnchor.MiddleCenter, FontStyle.Bold);
+                    Ui.Label(badge.transform, "NO ESPECTRO", 0, 0, 216, 24, 12, elemCol, TextAnchor.MiddleCenter, FontStyle.Bold);
 
                     Ui.Picture(card, "Sprite", Art.Fighter(def.Id, def.Element, def.Class), 56, 38, 124, 124);
                     Ui.Label(card, def.Name, 8, 166, 220, 26, 18, Theme.Text, TextAnchor.MiddleCenter, FontStyle.Bold, true);
                     Ui.Label(card, Theme.ElementName(def.Element) + " · " + Theme.ClassName(def.Class),
                         8, 192, 220, 20, 14, elemCol, TextAnchor.MiddleCenter, FontStyle.Bold);
-                    Ui.Label(card, "\"" + def.Appearance + "\" · 100% HP",
+                    Ui.Label(card, def.Appearance,
                         8, 216, 220, 22, 12, Theme.Good, TextAnchor.MiddleCenter, FontStyle.Italic);
                     animatedPortraits.Add((RectTransform)card.parent);
                 }
@@ -146,7 +147,7 @@ namespace ComboTactics.UI
             }
 
             bool isLast = _index >= _slides.Length - 1;
-            string nextLabel = isLast ? "Continuar Jornada ⚔" : "Próxima Cena ▸";
+            string nextLabel = isLast ? "Continuar" : "Próxima cena";
             Ui.Button(storyPanel, nextLabel, 948, 116, 212, 68, NextSlide, Theme.ButtonPrimary, 20);
             Ui.Label(storyPanel, "[Espaço ou Clique no botão]", 948, 190, 212, 24, 12, Theme.Muted, TextAnchor.MiddleCenter);
 
@@ -193,6 +194,7 @@ namespace ComboTactics.UI
 
         private void NextSlide()
         {
+            if (_index >= _slides.Length) return;
             _index++;
             if (_index >= _slides.Length)
                 FinishCutscene();
@@ -202,6 +204,9 @@ namespace ComboTactics.UI
 
         private void FinishCutscene()
         {
+            // Pular e o último "Continuar" no mesmo quadro não podem avançar a história duas vezes.
+            if (_finished) return;
+            _finished = true;
             CampaignStory.MarkCutsceneSeen(_cutsceneId);
             if (_onComplete != null) _onComplete();
             else App.ShowCampaign();

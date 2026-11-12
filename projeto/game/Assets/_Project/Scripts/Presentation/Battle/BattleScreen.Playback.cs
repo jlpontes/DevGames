@@ -21,6 +21,15 @@ namespace ComboTactics.UI
             var reaction = ev as ReactionResolved;
             if (reaction != null) { yield return PlayReaction(reaction); yield break; }
 
+            // A segunda fase vem do motor; os efeitos e a stamina chegam logo depois, como eventos comuns.
+            var phaseShift = ev as PhaseShifted;
+            if (phaseShift != null)
+            {
+                Apply(ev);
+                yield return PlayBossPhase2Awakening(phaseShift);
+                yield break;
+            }
+
             var damage = ev as DamageDealt;
             if (damage != null)
             {
@@ -681,25 +690,21 @@ namespace ComboTactics.UI
             widget.SetHp(hpAfter);
             yield return Wait(0.15f);
 
-            if (_match.Mode == GameMode.Campaign && _match.StageIndex == 3 && side == 1 && !_bossPhase2Triggered && hpAfter > 0 && hpAfter <= _view.Sides[1].Active.Spec.MaxHp * 0.5f)
-            {
-                _bossPhase2Triggered = true;
-                yield return PlayBossPhase2Awakening();
-            }
         }
 
-        /// <summary>Fase 2 do Boss Final (Hyperion): tremor lunar, surto de stamina máxima, buffs de ataque/defesa e fala dramática.</summary>
-        private IEnumerator PlayBossPhase2Awakening()
+        /// <summary>Segunda fase do Guardião do Núcleo: tremor, aura e fala. Os bônus em si já vieram do motor.</summary>
+        private IEnumerator PlayBossPhase2Awakening(PhaseShifted shift)
         {
-            var bossWidget = _fighters[1];
+            var bossWidget = _fighters[shift.Side];
+            var bossSpec = _view.Sides[shift.Side].Team[shift.FighterIndex].Spec;
             Color eclipseColor = new Color(0.76f, 0.54f, 1.0f, 1f);
 
             _stage.Shake(14f, 0.85f);
-            Say("O ECLIPSE TOTAL SE COMPLETA! Hyperion desperta sua verdadeira forma cósmica!");
+            Say(bossSpec.Name + ": " + shift.Title + "!");
 
             var banner = Ui.Frame(_overlay, "Phase2Banner", 200, 196, 880, 96, new Color(0.08f, 0.04f, 0.14f, 0.95f), eclipseColor, 2.5f);
-            Ui.Label(banner, "★ DESPERTAR DO TITÃ LUNAR — FASE 2 ★", 16, 10, 848, 40, 28, eclipseColor, TextAnchor.MiddleCenter, FontStyle.Bold, true);
-            Ui.Label(banner, "Stamina Máxima Restaurada  ·  Ataque +10%  ·  Defesa +10%", 16, 50, 848, 32, 16, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold);
+            Ui.Label(banner, "★ " + shift.Title.ToUpperInvariant() + " — 2ª FASE ★", 16, 10, 848, 40, 28, eclipseColor, TextAnchor.MiddleCenter, FontStyle.Bold, true);
+            Ui.Label(banner, "Stamina cheia  ·  Ataque +10%  ·  Defesa +10%", 16, 50, 848, 32, 16, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold);
 
             var pillar = SpawnVfx(Art.VfxPillar, bossWidget.CenterX, bossWidget.CenterY, 200f, 340f, eclipseColor);
             var ring = SpawnVfx(Art.VfxRing, bossWidget.CenterX, bossWidget.CenterY, 140f, 140f, Theme.Gold);
@@ -718,30 +723,14 @@ namespace ComboTactics.UI
             UnityEngine.Object.Destroy(banner.parent.gameObject);
             bossWidget.ResetPose();
 
-            // Aplica os bônus reais de Fase 2 no motor e na cópia visível da batalha.
-            _engine.State.Sides[1].Stamina = _engine.Rules.StaminaMax;
-            _view.Sides[1].Stamina = _engine.Rules.StaminaMax;
-
-            var bossFighter = _engine.State.Sides[1].Active;
-            EffectSpec atkSpec;
-            if (_engine.Catalog.Effects.TryGetValue(BuiltInContent.AttackUp, out atkSpec))
+            string quote = _match.Mode == GameMode.Campaign ? CampaignStory.Chapter(_match.StageIndex).PhaseShiftQuote : null;
+            if (!string.IsNullOrEmpty(quote))
             {
-                var appliedAtk = EffectSystem.Apply(bossFighter, bossFighter, atkSpec);
-                _view.Sides[1].Active.Effects[atkSpec.Id] = appliedAtk.TurnsLeft;
+                yield return PlayStorySequence(new[]
+                {
+                    new StoryLine(bossSpec.Name, "2ª fase", bossSpec.Id, bossSpec.Element, bossSpec.Class, quote)
+                });
             }
-            EffectSpec defSpec;
-            if (_engine.Catalog.Effects.TryGetValue(BuiltInContent.DefenseUp, out defSpec))
-            {
-                var appliedDef = EffectSystem.Apply(bossFighter, bossFighter, defSpec);
-                _view.Sides[1].Active.Effects[defSpec.Id] = appliedDef.TurnsLeft;
-            }
-            RefreshHud();
-
-            yield return PlayStorySequence(new[]
-            {
-                new StoryLine("Hyperion, o Titã Lunar", "Fase 2 · Despertar do Eclipse", BuiltInContent.BossId, Element.Neutral, CharClass.Neutral,
-                    "Vocês ousaram trincar minha armadura mortal?! Contemplem o poder absoluto da Lua Negra: minha Stamina e meu cosmos estão no limite máximo!")
-            });
         }
 
         /// <summary>Exibe diálogos da trama integrados à própria arena, avançando com clique, botão ou Espaço/Enter.</summary>

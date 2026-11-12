@@ -18,7 +18,10 @@ namespace ComboTactics.Game
         }
     }
 
-    /// <summary>Um cartão de história (GDD R12): fundo, título, narração, uma fala opcional e lutadores em destaque.</summary>
+    /// <summary>
+    /// Um cartão de história (GDD R12): fundo, título, narração, uma fala opcional e, quando lutadores entram
+    /// no espectro (ou celebram no final), os retratos deles em destaque.
+    /// </summary>
     public sealed class StoryBeat
     {
         public readonly ArenaId Backdrop;
@@ -94,7 +97,7 @@ namespace ComboTactics.Game
                     Mage("Eu senti o estalo no peito... como se o mundo tivesse perdido o compasso.", "Mago novato")),
                 new StoryBeat(ArenaId.Volcano, "ONDE OS FRAGMENTOS CAÍRAM",
                     "Onde cada fragmento caiu nasceu uma zona: o Vulcão, o Mar e a Floresta. A energia deles despertou as criaturas e lendas de cada lugar.",
-                    null, new[] { "fire_warrior", "water_warrior", "plant_warrior" }),
+                    null),
                 new StoryBeat(ArenaId.Moon, "O PESO DO NÚCLEO",
                     "O núcleo do cristal, sem elemento, foi parar na Lua. O peso dele deixou aquela zona pesada: lá, só os lentos pisam firme.",
                     Mage("Se eu reunir os três fragmentos, o caminho até o núcleo se abre. Mas sozinho eu não passo do primeiro guardião.", "Mago novato")),
@@ -178,7 +181,7 @@ namespace ComboTactics.Game
             };
 
             chapter.Opening.Add(new StoryBeat(HomeArena(element), actTitle.ToUpperInvariant(), setting,
-                new StoryLineDef(fullName, guardianTitle, portraitId, challenge), trio));
+                new StoryLineDef(fullName, guardianTitle, portraitId, challenge)));
             chapter.Opening.Add(new StoryBeat(HomeArena(element), "O DESAFIO DO GUARDIÃO",
                 ownElement
                     ? "Os lutadores de " + guardian + " são do mesmo elemento que o seu espectro. Vencer não traz ninguém novo, mas o fragmento é indispensável."
@@ -326,9 +329,8 @@ namespace ComboTactics.Game
             }
 
             var script = new MissionScript();
-            var fighters = recruit != null ? new[] { recruit.Id } : null;
             script.Briefing.Add(new StoryBeat(mission.Arena, "ECO DO CRISTAL · " + mission.Title.ToUpperInvariant(), pitch,
-                new StoryLineDef(name, "Eco do Cristal", mission.RecruitId, challenge), fighters));
+                new StoryLineDef(name, "Eco do Cristal", mission.RecruitId, challenge)));
             script.Victory.Add(new StoryLineDef(name, "Entra no espectro", mission.RecruitId, accept));
             script.Defeat.Add(new StoryLineDef(name, "Eco do Cristal", mission.RecruitId, "Ainda não. Volte quando o seu espectro estiver pronto."));
             return script;
