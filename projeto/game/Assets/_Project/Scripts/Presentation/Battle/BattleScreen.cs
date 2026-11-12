@@ -31,6 +31,9 @@ namespace ComboTactics.UI
         private Image _topBorder;
         private Image _dockBorder;
         private SkillSpec _incomingSkill;
+        private ReactionResult? _syncedReaction;
+        private float _animTimeScale = 1f;
+        private bool _syncingReaction;
         private Text _arenaName;
         private Text _arenaEffect;
         private Text _roundInfo;
@@ -271,21 +274,35 @@ namespace ComboTactics.UI
 
         public void AskReaction(int side, float windowSeconds, Action<ReactionResult> reply)
         {
-            _inputRoutine = App.Host.StartCoroutine(Coroutines.Guard(ReactionWindow(side, windowSeconds, reply), OnError));
+            if (_syncedReaction.HasValue)
+            {
+                var ready = _syncedReaction.Value;
+                _syncedReaction = null;
+                reply(ready);
+                return;
+            }
+            var qte = ComputeQteForSide(side);
+            _inputRoutine = App.Host.StartCoroutine(Coroutines.Guard(ReactionWindow(side, qte, reply), OnError));
+        }
+
+        private QteParams ComputeQteForSide(int defenderSide)
+        {
+            var defender = _engine.State.Sides[defenderSide].Active;
+            var attacker = _engine.State.Sides[1 - defenderSide].Active;
+            bool isSpecial = _incomingSkill != null && _incomingSkill.IsSpecial;
+            return QteConfig.Compute(defender.Spec.Speed, attacker.Spec.Speed, isSpecial);
         }
 
         /// <summary>
-        /// Janela de resposta dinâmica e fluida (GDD §5.5, R3): a Velocidade do defensor amplia a zona de acerto
-        /// e suaviza a travessia do marcador, enquanto Golpes Especiais (Super) aceleram a barra drasticamente.
+        /// Janela de resposta dinâmica, fluida e sincronizada com o golpe inimigo (GDD §5.5, R3):
+        /// o marcador corre junto com o avanço do ataque inimigo e atinge o alvo no exato momento do impacto.
         /// </summary>
-        private IEnumerator ReactionWindow(int side, float baseWindowSeconds, Action<ReactionResult> reply)
+        private IEnumerator ReactionWindow(int side, QteParams qte, Action<ReactionResult> reply)
         {
             var defender = _engine.State.Sides[side].Active;
-            var attacker = _engine.State.Sides[1 - side].Active;
+            var defenderWidget = _fighters[side];
             int defSpeed = defender.Spec.Speed;
-            int atkSpeed = attacker.Spec.Speed;
-            bool isSpecial = _incomingSkill != null && _incomingSkill.IsSpecial;
-            QteParams qte = QteConfig.Compute(defSpeed, atkSpeed, isSpecial);
+            bool isSpecial = qte.IsSpecial;
 
             const float barWidth = 440f, barHeight = 28f;
             const float barX = (Theme.Width - barWidth) * 0.5f, barY = 644f;
@@ -294,19 +311,25 @@ namespace ComboTactics.UI
             float perfectWidth = Mathf.Clamp(2f * qte.PerfectSeconds / qte.SweepSeconds, 0.018f, 0.28f) * barWidth;
 
             var root = Ui.Node(_overlay, "ReactionWindow", 0, 0, Theme.Width, Theme.Height);
-            var hitBox = Ui.Box(root, "HitCatcher", 0, 0, Theme.Width, Theme.Height, new Color(0f, 0f, 0f, isSpecial ? 0.28f : 0.16f));
+            var hitBox = Ui.Box(root, "HitCatcher", 0, 0, Theme.Width, Theme.Height, new Color(0f, 0f, 0f, isSpecial ? 0.22f : 0.08f));
             hitBox.raycastTarget = true;
             var catcher = hitBox.gameObject.AddComponent<ReactionInputCatcher>();
 
+            // Anel sincronizado no corpo do defensor que se fecha junto com o golpe inimigo até o momento exato do impacto.
+            var bodyRing = Ui.Picture(root, "ImpactTelegraph", Art.VfxRing, 0, 0, 260f, 260f);
+            var targetRing = Ui.Picture(root, "TargetCore", Art.VfxRing, 0, 0, 124f, 124f);
+            Ui.PlaceCentered(targetRing.rectTransform, defenderWidget.CenterX, defenderWidget.CenterY, 124f, 124f);
+            targetRing.color = new Color(1f, 0.85f, 0.30f, 0.35f);
+
             Color frameColor = isSpecial ? new Color(0.96f, 0.28f, 0.18f, 0.96f) : Theme.BorderGold;
             string headerText = isSpecial
-                ? "⚡ " + _match.SideNames[side].ToUpper() + ": DEFENDA O ESPECIAL! (BARRA RÁPIDA)"
-                : _match.SideNames[side] + ": DEFENDA COM " + defender.Spec.Name.ToUpper() + "!";
+                ? "⚡ " + _match.SideNames[side].ToUpper() + ": DEFENDA O ESPECIAL NO IMPACTO!"
+                : _match.SideNames[side] + ": DEFENDA NO IMPACTO DO GOLPE!";
             var title = Ui.Label(root, headerText, 0, 604, Theme.Width, 34, 24, isSpecial ? Theme.Bad : Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold, true);
 
             string speedSign = qte.SpeedBonusPercent >= 0 ? "+" + qte.SpeedBonusPercent + "%" : qte.SpeedBonusPercent + "%";
             string subText = isSpecial
-                ? "Golpe Supremo em curso! Janela reduzida e velocidade extrema · Clique ou Espaço no alvo"
+                ? "Golpe Supremo em curso! Janela reduzida e velocidade extrema · Clique ou Espaço no impacto"
                 : "VEL " + defSpeed + " (" + speedSign + " janela de reflexo) · Azul = Desvio · Dourado = Contra-ataque";
             Color subColor = !isSpecial && qte.SpeedBonusPercent >= 15 ? Theme.Good : Theme.Text;
             Ui.Label(root, subText, 0, 680, Theme.Width, 24, 14, subColor, TextAnchor.MiddleCenter, FontStyle.Bold, true);
@@ -327,21 +350,23 @@ namespace ComboTactics.UI
             Ui.PlaceCentered(marker.rectTransform, 0f, barHeight * 0.5f, 6f, barHeight + 12f);
             Ui.PlaceCentered(markerGlow.rectTransform, 0f, barHeight * 0.5f, 34f, barHeight + 22f);
 
-            // Breve entrada suave (0.14s) para o olho focar na barra sem travar o marcador nem punir clique residual.
+            // Breve entrada suave (0.14s) enquanto o atacante inicia o movimento, sem punir clique residual.
             float leadIn = 0f;
             while (leadIn < QteConfig.LeadInSeconds)
             {
                 leadIn += Time.unscaledDeltaTime;
                 float a = Mathf.Clamp01(leadIn / QteConfig.LeadInSeconds);
                 markerGlow.color = new Color(1f, 0.95f, 0.78f, 0.75f * a);
+                Ui.PlaceCentered(bodyRing.rectTransform, defenderWidget.CenterX, defenderWidget.CenterY, 270f, 270f);
+                bodyRing.color = new Color(1f, 0.9f, 0.6f, 0.35f * a);
                 yield return null;
             }
 
-            // Limpa eventual clique ocorrido durante o fade-in para o jogador nunca perder por clique residual.
             bool ignoreInitial = catcher.Pressed;
 
             ReactionResult result = ReactionResult.Miss;
             float elapsed = 0f;
+            float targetTime = qte.TargetNormalized * qte.SweepSeconds;
             float limit = qte.SweepSeconds + qte.GoodSeconds * 0.75f;
             float finalMarkerX = barWidth;
 
@@ -356,12 +381,19 @@ namespace ComboTactics.UI
                 Ui.PlaceCentered(trail.rectTransform, Mathf.Max(12f, mx - 18f), barHeight * 0.5f, Mathf.Min(44f, mx), barHeight - 6f);
                 trail.color = new Color(isSpecial ? 1f : 0.65f, 0.88f, 1f, 0.48f);
 
-                // Destaca visualmente a zona quando o marcador passa sobre o alvo.
-                float timeError = Mathf.Abs(elapsed - qte.TargetNormalized * qte.SweepSeconds);
+                // Sincroniza o anel de impacto sobre o lutador defensor com a aproximação do marcador até o alvo.
+                float timeError = Mathf.Abs(elapsed - targetTime);
                 bool inPerfect = timeError <= qte.PerfectSeconds;
                 bool inGood = timeError <= qte.GoodSeconds;
-                goodBox.color = inGood ? Color.Lerp(goodBaseColor, Color.white, 0.38f) : goodBaseColor;
+                goodBox.color = inGood ? Color.Lerp(goodBaseColor, Color.white, 0.42f) : goodBaseColor;
                 perfBox.color = inPerfect ? Color.white : perfBaseColor;
+
+                float approachRatio = Mathf.Clamp01(elapsed / Mathf.Max(0.01f, targetTime));
+                float ringSize = Mathf.Lerp(270f, 124f, approachRatio);
+                Color ringCol = inPerfect ? Theme.Gold : inGood ? goodBaseColor : new Color(1f, 0.75f, 0.45f, 0.55f);
+                Ui.PlaceCentered(bodyRing.rectTransform, defenderWidget.CenterX, defenderWidget.CenterY, ringSize, ringSize);
+                bodyRing.color = new Color(ringCol.r, ringCol.g, ringCol.b, inGood ? 0.92f : 0.55f);
+                targetRing.color = new Color(ringCol.r, ringCol.g, ringCol.b, inGood ? 0.85f : 0.35f);
 
                 if (isSpecial)
                 {
@@ -372,7 +404,7 @@ namespace ComboTactics.UI
                 bool mouseOrTouchAdded = !ignoreInitial && catcher.Pressed;
                 if (mouseOrTouchAdded || KeyOrMouseDown())
                 {
-                    result = QteConfig.Classify(elapsed - qte.TargetNormalized * qte.SweepSeconds, qte.PerfectSeconds, qte.GoodSeconds);
+                    result = QteConfig.Classify(elapsed - targetTime, qte.PerfectSeconds, qte.GoodSeconds);
                     break;
                 }
                 if (!catcher.Pressed) ignoreInitial = false;
@@ -381,22 +413,28 @@ namespace ComboTactics.UI
                 elapsed += Time.unscaledDeltaTime;
             }
 
+            // Acelera o restante final da animação do golpe para a reação/impacto sair imediatamente no clique!
+            _animTimeScale = 1.65f;
+
             Color resColor = result == ReactionResult.Counter ? Theme.Gold : result == ReactionResult.Dodge ? Theme.Good : Theme.Bad;
             title.text = BattleText.Reaction(result);
             title.color = resColor;
             marker.color = resColor;
             markerGlow.color = resColor;
+            bodyRing.color = new Color(resColor.r, resColor.g, resColor.b, 0.9f);
+            targetRing.color = new Color(resColor.r, resColor.g, resColor.b, 0f);
 
-            // Anel de confirmação imediata exatamente no ponto onde o marcador parou.
             var hitBurst = Ui.Picture(bar.transform, "Burst", Art.VfxRing, 0, 0, 24f, 24f);
             float burstTimer = 0f;
-            while (burstTimer < 0.32f)
+            while (burstTimer < 0.22f)
             {
                 burstTimer += Time.unscaledDeltaTime;
-                float p = Mathf.Clamp01(burstTimer / 0.32f);
+                float p = Mathf.Clamp01(burstTimer / 0.22f);
                 float sz = Mathf.Lerp(22f, 96f, p);
                 Ui.PlaceCentered(hitBurst.rectTransform, finalMarkerX, barHeight * 0.5f, sz, sz);
                 hitBurst.color = new Color(resColor.r, resColor.g, resColor.b, 1f - p);
+                Ui.PlaceCentered(bodyRing.rectTransform, defenderWidget.CenterX, defenderWidget.CenterY, Mathf.Lerp(124f, 220f, p), Mathf.Lerp(124f, 220f, p));
+                bodyRing.color = new Color(resColor.r, resColor.g, resColor.b, 1f - p);
                 yield return null;
             }
 

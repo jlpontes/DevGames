@@ -175,6 +175,21 @@ namespace ComboTactics.UI
             }
 
             string id = e.Skill.Id ?? "";
+            int defenderSide = 1 - e.Side;
+            bool syncWithHumanBar = _engine.Pending == PendingKind.Reaction
+                && _engine.PendingSide == defenderSide
+                && (defenderSide == 0 || _match.OpponentAi == null);
+
+            if (syncWithHumanBar)
+            {
+                var qte = ComputeQteForSide(defenderSide);
+                _syncedReaction = null;
+                _syncingReaction = true;
+                float timeToImpact = QteConfig.LeadInSeconds + qte.TargetNormalized * qte.SweepSeconds;
+                _animTimeScale = 0.28f / Mathf.Max(0.18f, timeToImpact);
+                _inputRoutine = App.Host.StartCoroutine(Coroutines.Guard(ReactionWindow(defenderSide, qte, r => _syncedReaction = r), OnError));
+            }
+
             if (id == "fire_mage_skill3") yield return AnimateMeteorShower(attacker, defender, elemColor);
             else if (id == "water_mage_skill3") yield return AnimateBlizzard(attacker, defender, elemColor);
             else if (id == "plant_mage_skill3") yield return AnimateLeafStorm(attacker, defender, elemColor);
@@ -191,6 +206,13 @@ namespace ComboTactics.UI
             else if (e.Skill.EffectTarget == EffectTarget.Self && !e.Skill.IsSpecial) yield return AnimateBuffAndStrike(attacker, defender, direction, elemColor);
             else if (fighterSpec.Class == CharClass.Tank) yield return AnimateHeavySlam(attacker, defender, direction, elemColor);
             else yield return AnimateMeleeSlash(attacker, defender, direction, elemColor, id == "plant_warrior_skill1");
+
+            if (syncWithHumanBar)
+            {
+                while (_inputRoutine != null) yield return null;
+                _syncingReaction = false;
+                _animTimeScale = 1f;
+            }
         }
 
         private IEnumerator AnimateMeleeSlash(FighterWidget attacker, FighterWidget defender, float direction, Color elemColor, bool doubleSlash)
@@ -867,14 +889,15 @@ namespace ComboTactics.UI
             return _view.Sides[side].Team[fighterIndex].Spec.Name + " (" + _match.SideNames[side] + ")";
         }
 
-        private static IEnumerator Tween(float seconds, Action<float> step)
+        private IEnumerator Tween(float seconds, Action<float> step)
         {
             float t = 0f;
             while (t < 1f)
             {
                 step(t);
                 yield return null;
-                t += Time.deltaTime * Speed / seconds;
+                float dt = _syncingReaction ? Time.unscaledDeltaTime * _animTimeScale : Time.deltaTime * Speed;
+                t += dt / seconds;
             }
             step(1f);
         }
