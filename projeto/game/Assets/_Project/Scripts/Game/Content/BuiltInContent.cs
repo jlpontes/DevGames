@@ -34,8 +34,12 @@ namespace ComboTactics.Game
         public const string GuardianCore = "guardian_core";
         public const string Echo = "echo";
 
-        /// <summary>Bônus de atributos dos guardiões por fase (R10 dizia +0 / +7 / +12%; ajustado pela simulação).</summary>
-        public static readonly double[] StageBonus = { 0.00, 0.07, 0.12, 0.00 };
+        /// <summary>
+        /// Bônus de atributos dos guardiões por fase. O R10 dizia +0 / +7 / +12%, mas com o espectro limitado e o HP
+        /// que persiste entre as fases isso travava as jornadas; os valores abaixo vêm da simulação da jornada
+        /// (CampaignSimulation): 1ª vitória em cerca de 85%, 55%, 45% e 50% das tentativas, nas quatro fases.
+        /// </summary>
+        public static readonly double[] StageBonus = { 0.00, 0.03, 0.03, 0.18 };
 
         public static ContentDatabase Create()
         {
@@ -129,7 +133,7 @@ namespace ComboTactics.Game
                 new AIProfile(Hard, "Difícil", 0.30, 0.90, 2, 0.80, 0.35, 0.00),
                 new AIProfile(GuardianFire, "Ignis", 0.25, 0.65, 2, 0.35, 0.25, 0.05),
                 new AIProfile(GuardianWater, "Nereu", 0.28, 0.80, 2, 0.45, 0.30, 0.03),
-                new AIProfile(GuardianPlant, "Sylvan", 0.30, 0.90, 2, 0.55, 0.35, 0.00),
+                new AIProfile(GuardianPlant, "Sylvan", 0.30, 0.85, 2, 0.48, 0.30, 0.02),
                 new AIProfile(GuardianCore, "Ástreo", 0.00, 0.00, 2, 0.45, 0.30, 0.00),
                 new AIProfile(Echo, "Eco do Cristal", 0.20, 0.60, 2, 0.40, 0.25, 0.05),
             };

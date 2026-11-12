@@ -218,7 +218,7 @@ namespace ComboTactics.Tests
             Assert.AreEqual(ArenaId.Sea, match.Setup.StartArena);
             Assert.AreEqual(3, match.Setup.Teams[1].Count);
             foreach (var fighter in match.Setup.Teams[1]) Assert.AreEqual(Element.Water, fighter.Element);
-            Assert.AreEqual(127, match.Setup.Teams[1][0].Attack); // Guerreiro de Água: 119 × 1,07 = 127,33
+            Assert.AreEqual(StatsResolver.Scale(119, 1 + BuiltInContent.StageBonus[1]), match.Setup.Teams[1][0].Attack); // Guerreiro de Água com o bônus da fase
             Assert.AreSame(_game.Content.AiProfiles[BuiltInContent.GuardianWater], match.OpponentAi);
             Assert.AreEqual(1, match.Setup.Items[1][BuiltInContent.MedKit]);
             Assert.AreEqual(1, match.Setup.Items[1][BuiltInContent.Medicine]);
@@ -232,7 +232,8 @@ namespace ComboTactics.Tests
 
             Assert.AreEqual(ArenaId.Moon, match.Setup.StartArena);
             Assert.AreEqual(1, match.Setup.Teams[1].Count);
-            Assert.That(match.Setup.Teams[1][0].MaxHp, Is.InRange(2400, 2800)); // R9: cerca de 3× o HP de um jogável
+            Assert.That(_game.Content.Character(BuiltInContent.BossId).BaseHp, Is.InRange(2400, 2800)); // R9: cerca de 3× o HP de um jogável
+            Assert.AreEqual(StatsResolver.Scale(2600, 1 + BuiltInContent.StageBonus[3]), match.Setup.Teams[1][0].MaxHp);
         }
 
         [Test]
