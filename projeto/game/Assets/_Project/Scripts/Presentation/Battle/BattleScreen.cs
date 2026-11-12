@@ -56,6 +56,8 @@ namespace ComboTactics.UI
         {
             _engine = new BattleEngine(_match.Setup);
             _view = new BattleSnapshot(_engine.State);
+            if (_match.Mode == GameMode.Campaign)
+                CampaignStory.ApplyPersistentHpToBattle(_engine, _view);
             // Seed e comandos reproduzem a batalha inteira: vão junto no relatório de erro.
             App.Errors.Context = () => "Batalha " + _match.Mode + " · seed " + _engine.Seed + "\n" + string.Join("\n", _engine.CommandLog);
 
@@ -116,16 +118,31 @@ namespace ComboTactics.UI
 
             yield return director.Run();
 
+            // Fim: paga as moedas, consome os itens usados, atualiza a campanha e salva (SYSTEM-DESIGN, Fluxo A).
+            var result = App.Services.Launcher.Finish(_match, _engine);
+
             if (_match.Mode == GameMode.Campaign)
             {
                 var chapter = CampaignStory.Chapter(_match.StageIndex);
                 if (_engine.WinnerSide == 0)
-                    CampaignStory.RecordStageVictoryTeam(_match.StageIndex, _match.Setup.Teams[0]);
+                {
+                    CampaignStory.RecordStageVictoryState(
+                        _match.StageIndex,
+                        _engine.State.Sides[0].Team,
+                        App.Services.Profile.CampaignStage,
+                        App.Services.Content,
+                        App.Services.Economy,
+                        (id, st) => App.Services.Profile.UpgradeLevel(id, st));
+                }
                 yield return PlayStorySequence(_engine.WinnerSide == 0 ? chapter.VictoryDialogue : chapter.DefeatDialogue);
+
+                if (_engine.WinnerSide == 0 && result.CampaignCompleted)
+                {
+                    App.Show(new CutsceneScreen(CampaignStory.GetEpilogueCutscene(), 4, () => App.ShowResult(_match, result)));
+                    yield break;
+                }
             }
 
-            // Fim: paga as moedas, consome os itens usados, atualiza a campanha e salva (SYSTEM-DESIGN, Fluxo A).
-            var result = App.Services.Launcher.Finish(_match, _engine);
             App.ShowResult(_match, result);
         }
 

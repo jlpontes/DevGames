@@ -16,8 +16,10 @@ namespace ComboTactics.UI
 
             // Moldura inferior integrada ao escudo do torneio, sem cobrir o emblema central.
             var dock = Ui.Frame(Root, "MenuDock", 100, 566, 1080, 104, new Color(0.06f, 0.05f, 0.08f, 0.86f), Theme.BorderGold, 2f);
+            int stg = App.Services.Profile.CampaignStage;
+            string storySub = stg >= 4 ? "Campanha Concluída ★" : "Salvo · Ato " + (stg + 1) + " de 4";
             string[] labels = { "História", "Contra IA", "PvP Local", "Loja" };
-            string[] subs = { "4 fases + Boss", "Treino tático", "2 jogadores", "Itens e evolução" };
+            string[] subs = { storySub, "Treino tático", "2 jogadores", "Itens e evolução" };
             System.Action[] actions = { App.ShowCampaign, App.ShowVsAi, App.ShowPvp, App.ShowStore };
             for (int i = 0; i < labels.Length; i++)
             {

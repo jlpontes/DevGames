@@ -42,17 +42,98 @@ namespace ComboTactics.UI
             return texture;
         }
 
+        public const string SummonerId = "summoner_mage";
+
         /// <summary>Verdadeiro quando existe um sprite do personagem em Resources/Art/Characters (arquivo com o id dele).</summary>
         public static bool HasSprite(string characterId)
         {
-            return LoadSprite(characterId) != null;
+            return characterId == SummonerId || LoadSprite(characterId) != null;
         }
 
         /// <summary>Sprite do personagem; sem arquivo para o id, entra a forma gerada por código.</summary>
         public static Texture2D Fighter(string characterId, Element element, CharClass charClass)
         {
+            if (characterId == SummonerId) return ProceduralSummoner();
             Texture2D sprite = LoadSprite(characterId);
             return sprite != null ? sprite : ProceduralFighter(element, charClass);
+        }
+
+        /// <summary>Retrato místico do protagonista (Kaelen, o Mago Invocador): manto arcano, olhos astrais e as 3 orbes elementais.</summary>
+        private static Texture2D ProceduralSummoner()
+        {
+            const string key = "fighter/summoner_mage";
+            Texture2D texture;
+            if (Cache.TryGetValue(key, out texture) && texture != null) return texture;
+
+            const int size = 128;
+            var pixels = new Color[size * size];
+            Color cloakDark = new Color(0.12f, 0.08f, 0.24f, 1f);
+            Color cloakLight = new Color(0.28f, 0.18f, 0.52f, 1f);
+            Color gold = new Color(0.98f, 0.80f, 0.32f, 1f);
+            Color fireOrb = Theme.ElementColor(Element.Fire);
+            Color waterOrb = Theme.ElementColor(Element.Water);
+            Color plantOrb = Theme.ElementColor(Element.Plant);
+
+            for (int y = 0; y < size; y++)
+            {
+                float ny = (y + 0.5f) / size;
+                for (int x = 0; x < size; x++)
+                {
+                    float nx = (x + 0.5f) / size;
+                    float dx = nx - 0.5f;
+                    float dy = ny - 0.5f;
+                    float dist = Mathf.Sqrt(dx * dx + dy * dy);
+
+                    Color c = Color.clear;
+
+                    // Halo rúnico dourado atrás do Mago Invocador
+                    float ringDist = Mathf.Abs(dist - 0.42f);
+                    if (ringDist < 0.035f)
+                    {
+                        float a = Mathf.Clamp01(1f - ringDist / 0.035f);
+                        c = new Color(gold.r, gold.g, gold.b, a * 0.85f);
+                    }
+
+                    // Silhueta de manto e capuz arcano
+                    float hoodWidth = ny < 0.45f ? Mathf.Lerp(0.36f, 0.22f, ny / 0.45f) : Mathf.Lerp(0.24f, 0.04f, (ny - 0.45f) / 0.44f);
+                    if (ny >= 0.08f && ny <= 0.88f && Mathf.Abs(dx) <= hoodWidth)
+                    {
+                        Color robe = Color.Lerp(cloakDark, cloakLight, ny);
+                        if (Mathf.Abs(Mathf.Abs(dx) - hoodWidth) < 0.025f) robe = gold;
+                        c = robe;
+
+                        // Sombra interna do capuz e olhos astrais brilhantes
+                        float faceDist = Mathf.Sqrt(dx * dx + (ny - 0.60f) * (ny - 0.60f) * 1.4f);
+                        if (faceDist < 0.11f)
+                        {
+                            c = new Color(0.05f, 0.03f, 0.10f, 1f);
+                            float eyeL = Mathf.Sqrt((dx + 0.04f) * (dx + 0.04f) + (ny - 0.60f) * (ny - 0.60f) * 3f);
+                            float eyeR = Mathf.Sqrt((dx - 0.04f) * (dx - 0.04f) + (ny - 0.60f) * (ny - 0.60f) * 3f);
+                            if (eyeL < 0.022f || eyeR < 0.022f) c = new Color(0.55f, 0.92f, 1f, 1f);
+                        }
+                    }
+
+                    // Três orbes elementais (Fogo, Água, Planta) orbitando o Mago
+                    float dFire = Mathf.Sqrt((nx - 0.20f) * (nx - 0.20f) + (ny - 0.72f) * (ny - 0.72f));
+                    if (dFire < 0.085f) c = Color.Lerp(fireOrb, Color.white, Mathf.Clamp01(1f - dFire / 0.085f) * 0.45f);
+
+                    float dWater = Mathf.Sqrt((nx - 0.80f) * (nx - 0.80f) + (ny - 0.72f) * (ny - 0.72f));
+                    if (dWater < 0.085f) c = Color.Lerp(waterOrb, Color.white, Mathf.Clamp01(1f - dWater / 0.085f) * 0.45f);
+
+                    float dPlant = Mathf.Sqrt((nx - 0.50f) * (nx - 0.50f) + (ny - 0.90f) * (ny - 0.90f));
+                    if (dPlant < 0.085f) c = Color.Lerp(plantOrb, Color.white, Mathf.Clamp01(1f - dPlant / 0.085f) * 0.45f);
+
+                    pixels[y * size + x] = c;
+                }
+            }
+
+            texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            texture.wrapMode = TextureWrapMode.Clamp;
+            texture.filterMode = FilterMode.Bilinear;
+            texture.SetPixels(pixels);
+            texture.Apply();
+            Cache[key] = texture;
+            return texture;
         }
 
         private static Texture2D LoadSprite(string characterId)

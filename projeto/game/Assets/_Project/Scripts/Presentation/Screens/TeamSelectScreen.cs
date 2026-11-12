@@ -7,8 +7,9 @@ using UnityEngine;
 namespace ComboTactics.UI
 {
     /// <summary>
-    /// Seleção de Personagens: 3 dos 9 lutadores (o primeiro escolhido começa na arena) e, fora do PvP,
-    /// até 3 itens do inventário (GDD R8). No PvP a tela aparece duas vezes: Equipe 1 e Equipe 2.
+    /// Seleção de Personagens / Acampamento do Invocador:
+    /// No Modo História mostra os Elementares despertados no Grimório, o HP persistente de cada um,
+    /// o Altar de Cura com moedas e a preparação de itens antes de entrar na arena.
     /// </summary>
     public sealed class TeamSelectScreen : UiScreen
     {
@@ -23,6 +24,7 @@ namespace ComboTactics.UI
 
         private List<string> Team { get { return _player == 0 ? _request.Team : _request.Team2; } }
         private bool IsPvp { get { return _request.Mode == GameMode.LocalPvp; } }
+        private bool IsCampaign { get { return _request.Mode == GameMode.Campaign; } }
 
         protected override void Build()
         {
@@ -31,25 +33,42 @@ namespace ComboTactics.UI
             int teamSize = services.Rules.MaxTeamSize;
             bool useUpgrades = !IsPvp || !services.Profile.FairPvp;
 
-            var fatigued = _request.Mode == GameMode.Campaign
-                ? CampaignStory.GetFatiguedCharacters(_request.StageIndex, services.Profile.CampaignStage)
-                : new HashSet<string>();
-            if (fatigued.Count > 0) Team.RemoveAll(id => fatigued.Contains(id));
+            // Na Campanha, verifica quais Elementares já foram despertados no Grimório e remove da seleção quem estiver sem HP ou selado.
+            int grimoireProgress = Mathf.Max(services.Profile.CampaignStage, _request.StageIndex);
+            var unlockedSet = IsCampaign ? CampaignStory.GetUnlockedElementals(grimoireProgress) : null;
+            if (IsCampaign)
+            {
+                Team.RemoveAll(id =>
+                {
+                    if (!unlockedSet.Contains(id)) return true;
+                    var def = content.Character(id);
+                    var sp = StatsResolver.ForPlayer(def, content, services.Economy, st => services.Profile.UpgradeLevel(id, st));
+                    return CampaignStory.GetPersistentHp(id, sp.MaxHp) <= 0;
+                });
+            }
 
-            Texture backdropArt = _request.Mode == GameMode.Campaign
+            Texture backdropArt = IsCampaign
                 ? Art.Arena(services.Campaign.Stages[_request.StageIndex].HomeArena)
                 : null;
             Ui.Backdrop(Root, backdropArt, 0.30f);
+
             string title = IsPvp
                 ? "Equipe " + (_player + 1) + " — Jogador " + (_player + 1)
-                : _request.Mode == GameMode.Campaign
-                    ? CampaignStory.Chapter(_request.StageIndex).ActTitle
+                : IsCampaign
+                    ? CampaignStory.Chapter(_request.StageIndex).ActTitle + " · Grimório de Invocação"
                     : "Seleção de Personagens";
-            Ui.Label(Root, title, 30, 12, 820, 44, 32, Theme.Gold, TextAnchor.MiddleLeft, FontStyle.Bold, true);
-            string sub = fatigued.Count > 0
-                ? "Escolha " + teamSize + " lutadores descansados (quem lutou na vitória anterior descansa por 1 fase)."
+            Ui.Label(Root, title, 30, 10, 780, 40, 30, Theme.Gold, TextAnchor.MiddleLeft, FontStyle.Bold, true);
+
+            string sub = IsCampaign
+                ? "Invocador Kaelen: escolha 3 Elementares vivos. Quem ficar no Grimório recupera +50% HP ao vencer a fase!"
                 : "Escolha " + teamSize + " lutadores para a arena. O 1º escolhido inicia o combate.";
-            Ui.Label(Root, sub, 30, 54, 820, 24, 15, Theme.Muted, TextAnchor.MiddleLeft);
+            Ui.Label(Root, sub, 30, 48, 790, 24, 14, Theme.Text, TextAnchor.MiddleLeft, FontStyle.Bold);
+
+            if (IsCampaign)
+            {
+                var coinsBox = Ui.Frame(Root, "CoinsTop", 1044, 14, 206, 44, Theme.Panel, Theme.BorderGold, 1.5f);
+                Ui.Label(coinsBox, "Moedas: " + services.Profile.Coins, 0, 0, 202, 40, 19, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold, true);
+            }
 
             // Grade 3×3: linhas por classe, colunas por elemento.
             var characters = content.PlayableCharacters;
@@ -60,14 +79,16 @@ namespace ComboTactics.UI
                 var spec = StatsResolver.ForPlayer(def, content, services.Economy,
                     useUpgrades ? (Func<Stat, int>)(stat => services.Profile.UpgradeLevel(id, stat)) : null);
                 int order = Team.IndexOf(def.Id);
-                DrawCard(spec, def, 30 + (i % 3) * 274, 88 + (i / 3) * 172, order, fatigued.Contains(id));
+                bool unlocked = !IsCampaign || unlockedSet.Contains(id);
+                int currentHp = IsCampaign ? CampaignStory.GetPersistentHp(id, spec.MaxHp) : spec.MaxHp;
+                DrawCard(spec, def, 30 + (i % 3) * 274, 80 + (i / 3) * 174, order, unlocked, currentHp);
             }
 
             // Painel da direita: resumo, oponente, itens e botões.
-            var side = Ui.Frame(Root, "Side", 856, 88, 394, 516, Theme.Panel, Theme.BorderGold, 2f);
-            float y = 12;
-            Ui.Label(side, "EQUIPE (" + Team.Count + "/" + teamSize + ")", 16, y, 362, 26, 18, Theme.Gold, TextAnchor.MiddleLeft, FontStyle.Bold);
-            y += 30;
+            var side = Ui.Frame(Root, "Side", 856, 80, 394, 524, Theme.Panel, Theme.BorderGold, 2f);
+            float y = 10;
+            Ui.Label(side, "CÍRCULO DE INVOCAÇÃO (" + Team.Count + "/" + teamSize + ")", 16, y, 362, 24, 17, Theme.Gold, TextAnchor.MiddleLeft, FontStyle.Bold);
+            y += 28;
             for (int i = 0; i < teamSize; i++)
             {
                 bool hasMember = i < Team.Count;
@@ -76,21 +97,25 @@ namespace ComboTactics.UI
                 if (hasMember)
                 {
                     var member = content.Character(Team[i]);
+                    var mSpec = StatsResolver.ForPlayer(member, content, services.Economy,
+                        useUpgrades ? (Func<Stat, int>)(stat => services.Profile.UpgradeLevel(member.Id, stat)) : null);
+                    int mHp = IsCampaign ? CampaignStory.GetPersistentHp(member.Id, mSpec.MaxHp) : mSpec.MaxHp;
                     Ui.Picture(slot, "Mini", Art.Fighter(member.Id, member.Element, member.Class), 6, 3, 28, 28);
                     string role = i == 0 ? "1º (Líder)" : (i + 1) + "º (Reserva)";
-                    Ui.Label(slot, role + " — " + member.Name, 40, 0, 314, 34, 15, Theme.Text, TextAnchor.MiddleLeft, FontStyle.Bold);
+                    Ui.Label(slot, role + " — " + member.Name + " (" + mHp + "/" + mSpec.MaxHp + " HP)",
+                        40, 0, 314, 34, 14, Theme.Text, TextAnchor.MiddleLeft, FontStyle.Bold);
                 }
                 else
                 {
-                    Ui.Label(slot, (i + 1) + "º Vaga aberta", 12, 0, 338, 34, 15, Theme.Muted, TextAnchor.MiddleLeft);
+                    Ui.Label(slot, (i + 1) + "º Vaga de invocação aberta", 12, 0, 338, 34, 14, Theme.Muted, TextAnchor.MiddleLeft);
                 }
                 y += 38;
             }
 
             y += 6;
-            var oppBox = Ui.Frame(side, "OpponentBox", 16, y, 362, 86, Theme.PanelLight, Theme.BorderSubtle, 1f);
-            Ui.Label(oppBox, OpponentInfo(), 10, 6, 342, 74, 14, Theme.Muted, TextAnchor.UpperLeft);
-            y += 96;
+            var oppBox = Ui.Frame(side, "OpponentBox", 16, y, 362, 92, Theme.PanelLight, Theme.BorderSubtle, 1f);
+            Ui.Label(oppBox, OpponentInfo(), 10, 6, 342, 80, 13, Theme.Muted, TextAnchor.UpperLeft);
+            y += 100;
 
             if (IsPvp)
             {
@@ -100,8 +125,8 @@ namespace ComboTactics.UI
             else
             {
                 int max = services.Rules.MaxItemsPerBattle;
-                Ui.Label(side, "MOCHILA DE COMBATE (" + TotalItems() + "/" + max + ")", 16, y, 362, 26, 17, Theme.Gold, TextAnchor.MiddleLeft, FontStyle.Bold);
-                y += 30;
+                Ui.Label(side, "MOCHILA DE COMBATE (" + TotalItems() + "/" + max + ")", 16, y, 362, 24, 16, Theme.Gold, TextAnchor.MiddleLeft, FontStyle.Bold);
+                y += 28;
                 foreach (var item in content.Items)
                 {
                     string itemId = item.Id;
@@ -118,63 +143,141 @@ namespace ComboTactics.UI
                 }
             }
 
-            Ui.Button(Root, "Voltar", 30, 628, 190, 56, Back, Theme.Button, 20);
+            // Barra inferior: Voltar, Altar de Cura + Cutscene (na Campanha) e Invocar na Arena
+            Ui.Button(Root, IsCampaign ? "Jornada" : "Voltar", 30, 620, 168, 60, Back, Theme.Button, 19);
+
+            if (IsCampaign)
+            {
+                Ui.Button(Root, "🎬 Rever Cutscene", 212, 620, 196, 60,
+                    () => App.PlayCampaignStage(_request.StageIndex, true), Theme.Button, 16);
+
+                bool anyDamaged = CampaignStory.HasAnyDamagedElemental(grimoireProgress, content, services.Economy,
+                    (id, st) => services.Profile.UpgradeLevel(id, st));
+                var healAllBtn = Ui.Button(Root,
+                    "✦ Altar: Curar Todos (" + CampaignStory.HealAllCost + "m)",
+                    422, 620, 272, 60, HealAllInSanctuary,
+                    anyDamaged ? new Color(0.16f, 0.36f, 0.24f, 0.96f) : Theme.Button, 16);
+                healAllBtn.interactable = anyDamaged;
+
+                Ui.Button(Root, "Loja & Evolução", 708, 620, 196, 60, App.ShowStore, Theme.Button, 16);
+            }
+
             bool ready = Team.Count == teamSize;
-            string confirmLabel = IsPvp && _player == 0 ? "Próximo: Equipe 2" : "Entrar na Arena!";
-            var confirm = Ui.Button(Root, confirmLabel, 930, 620, 320, 68, Confirm, ready ? Theme.ButtonPrimary : Theme.Button, 26);
+            string confirmLabel = IsPvp && _player == 0 ? "Próximo: Equipe 2" : "Invocar na Arena! ⚔";
+            var confirm = Ui.Button(Root, confirmLabel, 920, 616, 330, 68, Confirm, ready ? Theme.ButtonPrimary : Theme.Button, 24);
             confirm.interactable = ready;
         }
 
-        private void DrawCard(FighterSpec spec, CharacterDef def, float x, float y, int order, bool isFatigued)
+        private void DrawCard(FighterSpec spec, CharacterDef def, float x, float y, int order, bool isUnlocked, int currentHp)
         {
             bool selected = order >= 0;
+            bool isExhausted = isUnlocked && currentHp <= 0;
+            bool isDamaged = isUnlocked && currentHp < spec.MaxHp;
             Color elemColor = Theme.ElementColor(def.Element);
-            Color cardFill = isFatigued
-                ? new Color(0.08f, 0.07f, 0.10f, 0.92f)
-                : selected
-                    ? new Color(0.22f, 0.28f, 0.14f, 0.96f)
-                    : Theme.PanelLight;
-            var card = Ui.Button(Root, "", x, y, 262, 160, () => Toggle(def.Id, isFatigued), cardFill);
+
+            Color cardFill = !isUnlocked
+                ? new Color(0.06f, 0.05f, 0.08f, 0.90f)
+                : isExhausted
+                    ? new Color(0.14f, 0.06f, 0.07f, 0.94f)
+                    : selected
+                        ? new Color(0.22f, 0.28f, 0.14f, 0.96f)
+                        : Theme.PanelLight;
+
+            var card = Ui.Button(Root, "", x, y, 262, 162, () => Toggle(def.Id, isUnlocked, isExhausted), cardFill);
             var t = card.transform;
             var portrait = Ui.Frame(t, "Portrait", 10, 10, 68, 68, new Color(0.06f, 0.05f, 0.05f, 0.9f),
-                isFatigued ? Theme.BorderSubtle : selected ? Theme.Good : elemColor, 2f);
+                !isUnlocked || isExhausted ? Theme.BorderSubtle : selected ? Theme.Good : elemColor, 2f);
             var pic = Ui.Picture(portrait, "Icon", Art.Fighter(def.Id, def.Element, def.Class), 2, 2, 64, 64);
-            if (isFatigued) pic.color = new Color(0.35f, 0.35f, 0.40f, 0.75f);
+            if (!isUnlocked) pic.color = new Color(0.14f, 0.14f, 0.18f, 0.85f);
+            else if (isExhausted) pic.color = new Color(0.45f, 0.25f, 0.25f, 0.80f);
+
             if (!Art.HasSprite(def.Id))
                 Ui.Label(portrait, Theme.ClassLetter(def.Class), 0, 0, 68, 68, 28, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold, true);
-            Ui.Label(t, def.Name, 86, 8, 170, 26, 18, isFatigued ? Theme.Muted : Theme.Text, TextAnchor.MiddleLeft, FontStyle.Bold, true);
-            Ui.Label(t, Theme.ElementName(def.Element) + " · " + Theme.ClassName(def.Class), 86, 32, 170, 20, 14, elemColor, TextAnchor.MiddleLeft, FontStyle.Bold);
-            Ui.Label(t, def.Appearance, 86, 52, 170, 20, 12, Theme.Muted, TextAnchor.MiddleLeft, FontStyle.Italic);
-            Ui.Label(t, "HP " + spec.MaxHp + "  ATQ " + spec.Attack + "  DEF " + spec.Defense + "  VEL " + spec.Speed,
-                10, 82, 244, 22, 13, isFatigued ? Theme.Muted : Theme.Text, TextAnchor.MiddleLeft, FontStyle.Bold);
-            Ui.Label(t, spec.Skills[0].Name + " · " + spec.Skills[1].Name, 10, 104, 244, 20, 12, Theme.Muted, TextAnchor.MiddleLeft);
-            Ui.Label(t, "★ " + spec.Skills[2].Name, 10, 124, 244, 20, 12, Theme.Gold, TextAnchor.MiddleLeft, FontStyle.Bold);
-            if (isFatigued)
+
+            Ui.Label(t, isUnlocked ? def.Name : "??? (Espírito Selado)", 86, 8, 170, 24, 17,
+                !isUnlocked || isExhausted ? Theme.Muted : Theme.Text, TextAnchor.MiddleLeft, FontStyle.Bold, true);
+            Ui.Label(t, Theme.ElementName(def.Element) + " · " + Theme.ClassName(def.Class), 86, 30, 170, 20, 13, elemColor, TextAnchor.MiddleLeft, FontStyle.Bold);
+
+            if (IsCampaign && isUnlocked)
             {
-                var restBanner = Ui.Frame(t, "RestBanner", 8, 122, 246, 30, new Color(0.18f, 0.06f, 0.06f, 0.96f), Theme.Bad, 1.5f);
-                Ui.Label(restBanner, "EM DESCANSO (Lutou na fase anterior)", 4, 0, 234, 26, 11, Theme.Bad, TextAnchor.MiddleCenter, FontStyle.Bold);
+                // Barra de HP persistente do Guerreiro Elemental no Grimório
+                float ratio = Mathf.Clamp01(currentHp / (float)spec.MaxHp);
+                Color hpCol = ratio > 0.5f ? Theme.Good : ratio > 0.25f ? Theme.Gold : Theme.Bad;
+                Ui.Bar(t, 86, 54, 164, 18, ratio, hpCol, "HP " + currentHp + "/" + spec.MaxHp);
             }
-            else if (selected)
+            else
+            {
+                Ui.Label(t, def.Appearance, 86, 52, 170, 20, 12, Theme.Muted, TextAnchor.MiddleLeft, FontStyle.Italic);
+            }
+
+            Ui.Label(t, "HP " + spec.MaxHp + "  ATQ " + spec.Attack + "  DEF " + spec.Defense + "  VEL " + spec.Speed,
+                10, 82, 244, 20, 12, !isUnlocked || isExhausted ? Theme.Muted : Theme.Text, TextAnchor.MiddleLeft, FontStyle.Bold);
+            Ui.Label(t, spec.Skills[0].Name + " · " + spec.Skills[1].Name, 10, 102, 244, 18, 11, Theme.Muted, TextAnchor.MiddleLeft);
+            Ui.Label(t, "★ " + spec.Skills[2].Name, 10, 120, 244, 18, 11, Theme.Gold, TextAnchor.MiddleLeft, FontStyle.Bold);
+
+            if (!isUnlocked)
+            {
+                int actNum = CampaignStory.GetUnlockChapterNumber(def.Id);
+                var lockBanner = Ui.Frame(t, "LockBanner", 8, 124, 246, 30, new Color(0.08f, 0.06f, 0.14f, 0.96f), Theme.BorderGold, 1.5f);
+                Ui.Label(lockBanner, "🔒 DESPERTA NO ATO " + actNum + " DA HISTÓRIA", 4, 0, 234, 26, 11, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold);
+            }
+            else if (IsCampaign && isDamaged)
+            {
+                string id = def.Id;
+                string healText = isExhausted
+                    ? "EXAUSTO · Curar (" + CampaignStory.HealSingleCost + "m)"
+                    : "✦ Curar 100% (" + CampaignStory.HealSingleCost + "m)";
+                Ui.Button(t, healText, 10, 134, 242, 24, () => HealSingleInSanctuary(id, def.Name),
+                    isExhausted ? Theme.ButtonDanger : new Color(0.16f, 0.36f, 0.24f, 0.95f), 11);
+            }
+
+            if (selected)
             {
                 var badge = Ui.Frame(t, "Order", 50, 54, 34, 26, Theme.ButtonPrimary, Theme.Gold, 1.5f);
                 Ui.Label(badge, (order + 1) + "º", 0, 0, 34, 26, 15, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold, true);
             }
         }
 
+        private void HealSingleInSanctuary(string charId, string charName)
+        {
+            if (!App.Services.Profile.TrySpend(CampaignStory.HealSingleCost))
+            {
+                App.Notify("Moedas insuficientes! Você precisa de " + CampaignStory.HealSingleCost + " moedas para canalizar cura no Altar.");
+                return;
+            }
+            App.Services.Profile.Save();
+            CampaignStory.HealElementalFull(charId);
+            App.Notify(charName + " teve 100% do HP restaurado pelo Altar do Grimório!");
+            Rebuild();
+        }
+
+        private void HealAllInSanctuary()
+        {
+            if (!App.Services.Profile.TrySpend(CampaignStory.HealAllCost))
+            {
+                App.Notify("Moedas insuficientes! São necessárias " + CampaignStory.HealAllCost + " moedas para curar todo o Grimório.");
+                return;
+            }
+            App.Services.Profile.Save();
+            CampaignStory.HealAllElementals();
+            App.Notify("Todos os Elementares do seu Grimório foram 100% restaurados!");
+            Rebuild();
+        }
+
         private string OpponentInfo()
         {
             var services = App.Services;
-            if (_request.Mode == GameMode.Campaign)
+            if (IsCampaign)
             {
                 var opponent = services.Campaign.Stages[_request.StageIndex];
                 var chapter = CampaignStory.Chapter(_request.StageIndex);
                 var arena = services.Content.Catalog.Arenas[opponent.HomeArena];
                 string bonus = _request.StageIndex == 3
-                    ? "2 Fases (Despertar Cósmico em <50% HP)"
+                    ? "Boss 2 Fases (Desperta <50% HP)"
                     : "Atributos +" + Mathf.RoundToInt((float)chapter.ChallengingStatBonus * 100f) + "%";
                 return "Mestre: " + chapter.MasterName + " (" + bonus + ")\n" +
                        "Arena: " + arena.Name + " (" + Theme.ArenaEffect(arena, services.Rules) + ")\n" +
-                       "Regra: os 3 vencedores desta luta descansam na fase seguinte.";
+                       "Dano Persistente: o HP final fica salvo; reservas no Grimório curam +50% HP!";
             }
             if (_request.Mode == GameMode.VsAi)
                 return "Oponente: IA " + services.Content.AiProfiles[_request.DifficultyId].Name + "\nEquipe e arena inicial sorteadas.";
@@ -182,11 +285,17 @@ namespace ComboTactics.UI
                    (services.Profile.FairPvp ? "Modo Justo: atributos base." : "Modo Justo desligado: evoluções valem.");
         }
 
-        private void Toggle(string id, bool isFatigued)
+        private void Toggle(string id, bool isUnlocked, bool isExhausted)
         {
-            if (isFatigued)
+            if (!isUnlocked)
             {
-                App.Notify("Este lutador está em descanso após vencer a última arena! Escale outros guerreiros.");
+                int actNum = CampaignStory.GetUnlockChapterNumber(id);
+                App.Notify("Este Espírito Elemental ainda está selado! Avance até o Ato " + actNum + " para despertá-lo no Grimório.");
+                return;
+            }
+            if (isExhausted)
+            {
+                App.Notify("Este Elementar está com 0 HP! Deixe-o descansar por 1 vitória (+50% HP) ou cure-o no Altar.");
                 return;
             }
             if (Team.Contains(id)) Team.Remove(id);

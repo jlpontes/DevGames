@@ -77,6 +77,26 @@ namespace ComboTactics.UI
         public void ShowVsAi() { Show(new VsAiScreen()); }
         public void ShowPvp() { Show(new PvpScreen()); }
 
+        /// <summary>Botão único de História Contínua: retoma do ponto salvo (Cutscene do Ato -> Santuário/Equipe -> Batalha).</summary>
+        public void ContinueCampaignStory()
+        {
+            int currentStage = Mathf.Clamp(Services.Profile.CampaignStage, 0, Services.Campaign.Stages.Count - 1);
+            PlayCampaignStage(currentStage, false);
+        }
+
+        public void PlayCampaignStage(int stageIndex, bool forceCutscene)
+        {
+            int idx = Mathf.Clamp(stageIndex, 0, Services.Campaign.Stages.Count - 1);
+            var chapter = CampaignStory.Chapter(idx);
+            if ((forceCutscene || !CampaignStory.HasSeenCutscene(idx)) && chapter.ActCutscene != null && chapter.ActCutscene.Length > 0)
+            {
+                Show(new CutsceneScreen(chapter.ActCutscene, idx,
+                    () => ShowTeamSelect(new MatchRequest { Mode = GameMode.Campaign, StageIndex = idx }, 0)));
+                return;
+            }
+            ShowTeamSelect(new MatchRequest { Mode = GameMode.Campaign, StageIndex = idx }, 0);
+        }
+
         public void ShowTeamSelect(MatchRequest request, int player) { Show(new TeamSelectScreen(request, player)); }
 
         public void StartBattle(MatchRequest request)

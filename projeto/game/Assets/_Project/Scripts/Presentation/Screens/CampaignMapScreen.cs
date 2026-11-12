@@ -1,22 +1,44 @@
+using ComboTactics.Core;
 using ComboTactics.Game;
 using UnityEngine;
 
 namespace ComboTactics.UI
 {
-    /// <summary>Mapa da História: Fogo, Água, Planta e Boss Final. Cada fase libera a seguinte (GDD R10).</summary>
+    /// <summary>
+    /// Hub da Jornada Contínua do Modo História ("O Grimório do Eclipse"):
+    /// Apresenta o protagonista (Kaelen, o Mago Invocador), a linha do tempo dos 4 Selos,
+    /// o estado de vida persistente dos 9 Elementares no Grimório e 1 botão principal "Jogar / Continuar História".
+    /// </summary>
     public sealed class CampaignMapScreen : UiScreen
     {
         protected override void Build()
         {
             var services = App.Services;
-            Ui.Backdrop(Root);
-            Ui.Label(Root, "Crônicas do Eclipse · Modo História", 44, 10, 680, 38, 32, Theme.Gold, TextAnchor.MiddleLeft, FontStyle.Bold, true);
-            Ui.Label(Root, CampaignStory.CurrentActSummary(services.Profile.CampaignStage),
-                44, 46, 940, 32, 14, Theme.Text, TextAnchor.MiddleLeft, FontStyle.Bold);
+            var content = services.Content;
+            int progress = services.Profile.CampaignStage;
+            int currentActIdx = Mathf.Clamp(progress, 0, services.Campaign.Stages.Count - 1);
+            var currentChapter = CampaignStory.Chapter(currentActIdx);
+            var unlockedSet = CampaignStory.GetUnlockedElementals(progress);
 
-            var coins = Ui.Frame(Root, "Coins", 1020, 16, 216, 44, Theme.Panel, Theme.BorderGold);
-            Ui.Label(coins.transform, "Moedas: " + services.Profile.Coins, 0, 0, 212, 40, 20, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold);
+            Ui.Backdrop(Root, Art.Arena(services.Campaign.Stages[currentActIdx].HomeArena), 0.26f);
 
+            // 1. Cabeçalho do Protagonista (Kaelen, o Mago Invocador) e Save Automático
+            var heroBar = Ui.Frame(Root, "HeroHeader", 36, 12, 968, 70, Theme.Panel, Theme.BorderGold, 2f);
+            Ui.Picture(heroBar, "SummonerPortrait", Art.Fighter(Art.SummonerId, Element.Neutral, CharClass.Mage), 10, 5, 56, 56);
+            Ui.Label(heroBar, CampaignStory.SummonerName.ToUpper() + "  ·  MODO HISTÓRIA CONTÍNUO",
+                78, 6, 620, 28, 22, Theme.Gold, TextAnchor.MiddleLeft, FontStyle.Bold, true);
+            Ui.Label(heroBar, CampaignStory.CurrentActSummary(progress),
+                78, 34, 876, 26, 13, Theme.Text, TextAnchor.MiddleLeft);
+
+            var saveBadge = Ui.Frame(heroBar, "SaveBadge", 734, 8, 220, 24, Theme.PanelLight, Theme.Good, 1f);
+            Ui.Label(saveBadge, "✓ JORNADA SALVA (" + unlockedSet.Count + "/9 ELEMENTARES)",
+                4, 0, 212, 22, 11, Theme.Good, TextAnchor.MiddleCenter, FontStyle.Bold);
+
+            var coins = Ui.Frame(Root, "Coins", 1018, 12, 226, 70, Theme.Panel, Theme.BorderGold, 2f);
+            Ui.Label(coins, "MOEDAS DO CLÃ", 0, 8, 222, 20, 12, Theme.Muted, TextAnchor.MiddleCenter, FontStyle.Bold);
+            Ui.Label(coins, services.Profile.Coins.ToString(), 0, 28, 222, 34, 26, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold, true);
+
+            // 2. Linha do Tempo dos 4 Atos da História
             var stages = services.Campaign.Stages;
             for (int i = 0; i < stages.Count; i++)
             {
@@ -24,65 +46,133 @@ namespace ComboTactics.UI
                 var chapter = CampaignStory.Chapter(i);
                 bool unlocked = services.Campaign.IsUnlocked(i);
                 bool cleared = services.Campaign.IsCleared(i);
-                var arena = services.Content.Catalog.Arenas[opponent.HomeArena];
+                bool isCurrent = i == currentActIdx && !services.Campaign.IsCompleted;
+                var arena = content.Catalog.Arenas[opponent.HomeArena];
                 Color accent = arena.UsesSpeedBands ? Theme.Gold : Theme.ElementColor(arena.Favoured);
-                Color border = !unlocked ? new Color(0.24f, 0.22f, 0.28f, 0.7f) : cleared ? Theme.Good : accent;
+                Color border = isCurrent ? Theme.Gold : !unlocked ? new Color(0.24f, 0.22f, 0.28f, 0.7f) : cleared ? Theme.Good : accent;
 
-                var card = Ui.Frame(Root, "Stage" + i, 44 + i * 302, 92, 286, 524, Theme.PanelLight, border, 2.5f);
-                var picture = Ui.Picture(card.transform, "Arena", Art.Arena(opponent.HomeArena), 10, 10, 262, 144);
+                var card = Ui.Frame(Root, "Stage" + i, 36 + i * 304, 92, 292, 392,
+                    isCurrent ? new Color(0.14f, 0.11f, 0.18f, 0.96f) : Theme.PanelLight, border, isCurrent ? 3f : 2f);
+
+                var picture = Ui.Picture(card, "Arena", Art.Arena(opponent.HomeArena), 10, 10, 268, 122);
                 if (!unlocked) picture.color = new Color(0.25f, 0.25f, 0.28f, 1f);
 
-                // Exibe os lutadores do oponente sobre a prévia da arena
                 int count = opponent.TeamIds.Count;
                 for (int t = 0; t < count; t++)
                 {
-                    var def = services.Content.Character(opponent.TeamIds[t]);
-                    float size = count == 1 ? 92f : 68f;
-                    float spacing = 74f;
-                    float startX = 141f - ((count - 1) * spacing) * 0.5f - size * 0.5f;
-                    var icon = Ui.Picture(card.transform, "Fighter" + t, Art.Fighter(def.Id, def.Element, def.Class), startX + t * spacing, 148f - size, size, size);
+                    var def = content.Character(opponent.TeamIds[t]);
+                    float size = count == 1 ? 84f : 62f;
+                    float spacing = 68f;
+                    float startX = 144f - ((count - 1) * spacing) * 0.5f - size * 0.5f;
+                    var icon = Ui.Picture(card, "Fighter" + t, Art.Fighter(def.Id, def.Element, def.Class), startX + t * spacing, 126f - size, size, size);
                     if (!unlocked) icon.color = new Color(0.18f, 0.18f, 0.22f, 0.9f);
                 }
 
-                var badge = Ui.Box(card.transform, "StageBadge", 10, 10, 106, 26, new Color(0.05f, 0.04f, 0.07f, 0.88f));
-                Ui.Label(badge.transform, "CAPÍTULO " + (i + 1), 0, 0, 106, 26, 12, accent, TextAnchor.MiddleCenter, FontStyle.Bold);
+                string badgeText = isCurrent ? "★ CAPÍTULO ATUAL" : cleared ? "✓ CONCLUÍDO" : "ATO " + (i + 1);
+                var badge = Ui.Box(card, "StageBadge", 10, 10, 142, 24, new Color(0.05f, 0.04f, 0.07f, 0.90f));
+                Ui.Label(badge.transform, badgeText, 0, 0, 142, 24, 11, isCurrent ? Theme.Gold : cleared ? Theme.Good : accent, TextAnchor.MiddleCenter, FontStyle.Bold);
 
-                Ui.Label(card.transform, chapter.MasterName, 10, 160, 262, 30, 20, Theme.Text, TextAnchor.MiddleCenter, FontStyle.Bold, true);
-                Ui.Label(card.transform, chapter.MasterTitle + " · " + chapter.SealName, 10, 188, 262, 20, 12, accent, TextAnchor.MiddleCenter, FontStyle.Bold);
-                Ui.Label(card.transform, chapter.MapSynopsis, 14, 212, 254, 66, 13, Theme.Muted, TextAnchor.UpperCenter);
+                Ui.Label(card, chapter.ActTitle, 10, 138, 268, 24, 17, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold, true);
+                Ui.Label(card, chapter.MasterName, 10, 162, 268, 22, 15, Theme.Text, TextAnchor.MiddleCenter, FontStyle.Bold);
+                Ui.Label(card, chapter.MapSynopsis, 12, 186, 264, 62, 12, Theme.Muted, TextAnchor.UpperCenter);
 
-                var arenaBox = Ui.Frame(card.transform, "ArenaBox", 12, 282, 258, 62, Theme.Panel, Theme.BorderSubtle, 1f);
-                string bonusTag = i == 3 ? "Boss 2 Fases (Despertar <50% HP)" : "Atributos +" + Mathf.RoundToInt((float)chapter.ChallengingStatBonus * 100f) + "%";
-                Ui.Label(arenaBox.transform, "Arena " + arena.Name + " · " + bonusTag, 6, 4, 246, 22, 13, accent, TextAnchor.MiddleCenter, FontStyle.Bold);
-                Ui.Label(arenaBox.transform, Theme.ArenaEffect(arena, services.Rules), 6, 28, 246, 28, 12, Theme.Text);
+                // Mostra os Elementares que despertam neste Ato
+                var pactBox = Ui.Frame(card, "PactBox", 10, 252, 268, 56, Theme.Panel, Theme.BorderSubtle, 1f);
+                if (chapter.NewlySummonedIds.Length > 0)
+                {
+                    Ui.Label(pactBox, "Pacto do Grimório neste Ato (+3 Elementares):", 6, 2, 254, 18, 11, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold);
+                    for (int e = 0; e < chapter.NewlySummonedIds.Length; e++)
+                    {
+                        var eDef = content.Character(chapter.NewlySummonedIds[e]);
+                        Ui.Picture(pactBox, "PactIcon" + e, Art.Fighter(eDef.Id, eDef.Element, eDef.Class), 42 + e * 68, 20, 32, 32);
+                    }
+                }
+                else
+                {
+                    Ui.Label(pactBox, "Grimório Completo (9/9 Elementares)\nBoss de 2 Fases (Despertar <50% HP)",
+                        6, 6, 254, 42, 11, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold);
+                }
 
-                Ui.Label(card.transform, "Recompensa: " + opponent.Reward + " moedas", 10, 352, 262, 24, 15, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold);
-
-                string status = cleared ? "★ SELO CONQUISTADO" : unlocked ? "DESAFIAR AGORA" : "SELO ANTERIOR NECESSÁRIO";
-                Ui.Label(card.transform, status, 10, 380, 262, 24, 14, cleared ? Theme.Good : unlocked ? Theme.Text : Theme.Bad, TextAnchor.MiddleCenter, FontStyle.Bold);
+                Ui.Label(card, "Arena " + arena.Name + " · Recompensa: " + opponent.Reward + " moedas",
+                    10, 314, 268, 20, 12, accent, TextAnchor.MiddleCenter, FontStyle.Bold);
 
                 int stageIndex = i;
-                var button = Ui.Button(card.transform, cleared ? "Rejogar Capítulo" : "Entrar na Arena", 26, 434, 230, 54,
-                    () => App.ShowTeamSelect(new MatchRequest { Mode = GameMode.Campaign, StageIndex = stageIndex }, 0),
-                    unlocked ? Theme.ButtonPrimary : Theme.Button, 20);
-                button.interactable = unlocked;
+                string stageBtnText = isCurrent ? "▶ Continuar Aqui" : cleared ? "🎬 Rever / Jogar Ato" : "🔒 Bloqueado";
+                var stageBtn = Ui.Button(card, stageBtnText, 24, 338, 240, 40,
+                    () => App.PlayCampaignStage(stageIndex, cleared),
+                    isCurrent ? Theme.ButtonPrimary : Theme.Button, 15);
+                stageBtn.interactable = unlocked;
             }
 
-            Ui.Button(Root, "Voltar ao Menu", 44, 636, 200, 52, App.ShowMenu, Theme.Button, 19);
+            // 3. Faixa do Grimório Elemental (Mostra os 9 Elementares e o HP Persistente atual de cada um!)
+            var grimoireBar = Ui.Frame(Root, "GrimoireBar", 36, 494, 1208, 112, Theme.Panel, Theme.BorderGold, 2f);
+            string restInfo = CampaignStory.GetLastRestReport();
+            Ui.Label(grimoireBar,
+                "GRIMÓRIO ASTRAL — VIDA PERSISTENTE ENTRE AS FASES   " +
+                (string.IsNullOrEmpty(restInfo) ? "(Quem fica no banco recupera +50% HP ao vencer uma fase)" : "·  " + restInfo),
+                14, 4, 1180, 22, 13, Theme.Gold, TextAnchor.MiddleLeft, FontStyle.Bold);
 
-            var fatigued = CampaignStory.GetFatiguedCharacters(services.Profile.CampaignStage, services.Profile.CampaignStage);
-            if (fatigued.Count > 0)
+            var allChars = content.PlayableCharacters;
+            for (int i = 0; i < allChars.Count; i++)
             {
-                var names = new System.Collections.Generic.List<string>();
-                foreach (var id in fatigued)
+                var def = allChars[i];
+                bool isUnlocked = unlockedSet.Contains(def.Id);
+                var spec = StatsResolver.ForPlayer(def, content, services.Economy, st => services.Profile.UpgradeLevel(def.Id, st));
+                int hp = CampaignStory.GetPersistentHp(def.Id, spec.MaxHp);
+                float ratio = isUnlocked ? Mathf.Clamp01(hp / (float)spec.MaxHp) : 0f;
+                Color elemCol = Theme.ElementColor(def.Element);
+
+                var mini = Ui.Frame(grimoireBar, "Grim_" + def.Id, 12 + i * 132, 28, 126, 76,
+                    isUnlocked ? Theme.PanelLight : new Color(0.05f, 0.05f, 0.08f, 0.85f),
+                    isUnlocked ? elemCol : Theme.BorderSubtle, 1.5f);
+                var pic = Ui.Picture(mini, "Icon", Art.Fighter(def.Id, def.Element, def.Class), 6, 6, 40, 40);
+                if (!isUnlocked) pic.color = new Color(0.15f, 0.15f, 0.20f, 0.8f);
+
+                string shortName = def.Name.Replace("Guerreiro de ", "G. ").Replace("Mago de ", "M. ").Replace("Tanque de ", "T. ");
+                Ui.Label(mini, isUnlocked ? shortName : "🔒 Ato " + CampaignStory.GetUnlockChapterNumber(def.Id),
+                    50, 6, 72, 20, 12, isUnlocked ? Theme.Text : Theme.Muted, TextAnchor.MiddleLeft, FontStyle.Bold);
+                Ui.Label(mini, isUnlocked ? (hp + "/" + spec.MaxHp) : "Selado",
+                    50, 26, 72, 18, 11, !isUnlocked ? Theme.Muted : hp <= 0 ? Theme.Bad : Theme.Gold, TextAnchor.MiddleLeft, FontStyle.Bold);
+
+                if (isUnlocked)
                 {
-                    var def = services.Content.Character(id);
-                    if (def != null) names.Add(def.Name);
+                    Color barCol = ratio > 0.5f ? Theme.Good : ratio > 0.25f ? Theme.Gold : Theme.Bad;
+                    Ui.Bar(mini, 6, 52, 110, 14, ratio, barCol, hp <= 0 ? "EXAUSTO" : "");
                 }
-                var restBox = Ui.Frame(Root, "FatigueInfo", 264, 636, 972, 52, Theme.Panel, Theme.BorderGold, 1.5f);
-                Ui.Label(restBox, "★ Regra de Rodízio do Torneio — Em descanso da última vitória: " + string.Join(", ", names.ToArray()),
-                    14, 0, 944, 48, 14, Theme.Gold, TextAnchor.MiddleLeft, FontStyle.Bold);
             }
+
+            // 4. Barra de Ação Principal (1 Botão Play Contínuo em Destaque!)
+            Ui.Button(Root, "Menu Principal", 36, 620, 184, 68, App.ShowMenu, Theme.Button, 18);
+
+            bool anyDamaged = CampaignStory.HasAnyDamagedElemental(progress, content, services.Economy,
+                (id, st) => services.Profile.UpgradeLevel(id, st));
+            var healBtn = Ui.Button(Root, "✦ Altar: Curar Todos (" + CampaignStory.HealAllCost + "m)",
+                234, 620, 264, 68, () =>
+                {
+                    if (!services.Profile.TrySpend(CampaignStory.HealAllCost))
+                    {
+                        App.Notify("Você precisa de " + CampaignStory.HealAllCost + " moedas para restaurar o Grimório no Altar.");
+                        return;
+                    }
+                    services.Profile.Save();
+                    CampaignStory.HealAllElementals();
+                    App.Notify("Altar Astral: todos os Elementares voltaram a 100% de HP!");
+                    Rebuild();
+                }, anyDamaged ? new Color(0.16f, 0.36f, 0.24f, 0.96f) : Theme.Button, 16);
+            healBtn.interactable = anyDamaged;
+
+            Ui.Button(Root, "Loja & Evolução", 512, 620, 204, 68, App.ShowStore, Theme.Button, 18);
+
+            string playLabel = services.Campaign.IsCompleted
+                ? "▶ JOGAR CAPÍTULO FINAL (HYPERION)"
+                : progress == 0 && !CampaignStory.HasSeenCutscene(0)
+                    ? "▶ INICIAR HISTÓRIA (ATO I)"
+                    : "▶ CONTINUAR HISTÓRIA (" + currentChapter.ActTitle.Split('·')[0].Trim().ToUpper() + ")";
+
+            var playBtn = Ui.Button(Root, "", 732, 616, 512, 76, App.ContinueCampaignStory, Theme.ButtonPrimary, 24);
+            Ui.Label(playBtn.transform, playLabel, 12, 8, 488, 36, 24, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold, true);
+            Ui.Label(playBtn.transform, "Fluxo Contínuo com Save Automático: Cutscene ➔ Grimório ➔ Batalha",
+                12, 44, 488, 22, 13, new Color(1f, 0.92f, 0.78f, 0.95f), TextAnchor.MiddleCenter, FontStyle.Bold);
         }
     }
 }

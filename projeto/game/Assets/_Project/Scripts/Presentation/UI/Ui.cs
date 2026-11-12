@@ -182,6 +182,15 @@ namespace ComboTactics.UI
         {
             for (int i = parent.childCount - 1; i >= 0; i--) UnityEngine.Object.Destroy(parent.GetChild(i).gameObject);
         }
+
+        public static UiBar Bar(Transform parent, float x, float y, float w, float h, float fraction, Color fillColor, string text = "")
+        {
+            var bar = new UiBar(parent, x, y, w, h, fillColor);
+            bar.Set(fraction);
+            if (!string.IsNullOrEmpty(text))
+                Label(parent, text, x, y, w, h, Mathf.Max(10, Mathf.RoundToInt(h - 6f)), Theme.Text, TextAnchor.MiddleCenter, FontStyle.Bold, true);
+            return bar;
+        }
     }
 
     /// <summary>Barra horizontal (HP, stamina) preenchida da esquerda para a direita.</summary>
