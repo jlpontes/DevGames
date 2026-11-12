@@ -41,6 +41,24 @@ namespace ComboTactics.Game
                 CheckKit(content, opponent.Id, opponent.Items, errors);
             }
 
+            foreach (var mission in content.Missions)
+            {
+                var recruit = content.Character(mission.RecruitId);
+                if (recruit == null || !recruit.Playable) errors.Add(mission.Id + ": recruta precisa ser um personagem jogável.");
+                if (mission.PlayerTeamSize < 1 || mission.PlayerTeamSize > 3) errors.Add(mission.Id + ": equipe do jogador precisa ter de 1 a 3 lutadores.");
+                if (mission.EnemyTeamIds.Count < 1 || mission.EnemyTeamIds.Count > 3) errors.Add(mission.Id + ": equipe inimiga precisa ter de 1 a 3 lutadores.");
+                foreach (var id in mission.EnemyTeamIds) if (content.Character(id) == null) errors.Add(mission.Id + ": personagem desconhecido " + id);
+                if (!content.AiProfiles.ContainsKey(mission.AiProfileId)) errors.Add(mission.Id + ": perfil de IA desconhecido " + mission.AiProfileId);
+                if (mission.RewardItemId != null && content.Item(mission.RewardItemId) == null) errors.Add(mission.Id + ": item de recompensa desconhecido.");
+                if (mission.RequiredStagesCleared < 0 || mission.RequiredStagesCleared >= content.Opponents.Count) errors.Add(mission.Id + ": leva inválida.");
+            }
+            foreach (var c in content.Characters)
+            {
+                if (c.PhaseShift == null) continue;
+                foreach (var id in c.PhaseShift.EffectIds)
+                    if (!content.Catalog.Effects.ContainsKey(id)) errors.Add(c.Id + ": efeito da segunda fase desconhecido " + id);
+            }
+
             CheckKit(content, "FairKit", content.FairKit, errors);
             CheckKit(content, "VsAiOpponentKit", content.VsAiOpponentKit, errors);
             if (content.PlayableCharacters.Count < 3) errors.Add("É preciso ao menos 3 personagens jogáveis.");

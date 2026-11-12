@@ -45,6 +45,27 @@ namespace ComboTactics.Core
     }
 
     /// <summary>
+    /// Segunda fase de um lutador (o Guardião do Núcleo, por exemplo): ao cair até HpFraction do HP máximo,
+    /// recebe os efeitos listados e, se FillsStamina, a barra de stamina do lado enche. Acontece uma vez por batalha.
+    /// </summary>
+    public sealed class PhaseShiftSpec
+    {
+        public readonly double HpFraction;
+        public readonly IReadOnlyList<string> EffectIds;
+        public readonly bool FillsStamina;
+        public readonly string Title;
+
+        public PhaseShiftSpec(double hpFraction, IReadOnlyList<string> effectIds, bool fillsStamina, string title)
+        {
+            if (hpFraction <= 0 || hpFraction >= 1) throw new ArgumentException("HpFraction precisa ficar entre 0 e 1.");
+            HpFraction = hpFraction;
+            EffectIds = effectIds ?? new string[0];
+            FillsStamina = fillsStamina;
+            Title = title;
+        }
+    }
+
+    /// <summary>
     /// Lutador pronto para a batalha: atributos já com evoluções ou bônus de fase aplicados.
     /// Skills[0] e Skills[1] são as habilidades normais; a última é o especial.
     /// </summary>
@@ -59,14 +80,16 @@ namespace ComboTactics.Core
         public readonly int Defense;
         public readonly int Speed;
         public readonly IReadOnlyList<SkillSpec> Skills;
+        /// <summary>Segunda fase opcional (null para os lutadores comuns).</summary>
+        public readonly PhaseShiftSpec PhaseShift;
 
         public FighterSpec(string id, string name, Element element, CharClass charClass,
-            int maxHp, int attack, int defense, int speed, IReadOnlyList<SkillSpec> skills)
+            int maxHp, int attack, int defense, int speed, IReadOnlyList<SkillSpec> skills, PhaseShiftSpec phaseShift = null)
         {
             if (skills == null || skills.Count == 0) throw new ArgumentException("Lutador sem habilidades: " + id);
             if (skills[0].IsSpecial) throw new ArgumentException("A primeira habilidade precisa ser normal: " + id);
             Id = id; Name = name; Element = element; Class = charClass;
-            MaxHp = maxHp; Attack = attack; Defense = defense; Speed = speed; Skills = skills;
+            MaxHp = maxHp; Attack = attack; Defense = defense; Speed = speed; Skills = skills; PhaseShift = phaseShift;
         }
     }
 

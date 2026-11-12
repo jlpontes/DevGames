@@ -30,6 +30,8 @@ namespace ComboTactics.Core
         PendingKind Pending { get; }
         /// <summary>Quem precisa responder quando Pending é Reaction ou ForcedSwitch.</summary>
         int PendingSide { get; }
+        /// <summary>Habilidade que o defensor está tentando evitar quando Pending é Reaction; null nos outros casos.</summary>
+        SkillSpec PendingSkill { get; }
 
         bool IsOver { get; }
         /// <summary>0 ou 1; -1 em caso de empate. Só vale quando IsOver é verdadeiro.</summary>

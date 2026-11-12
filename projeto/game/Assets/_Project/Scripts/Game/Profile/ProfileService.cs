@@ -98,6 +98,83 @@ namespace ComboTactics.Game
 
         public void SetFairPvp(bool value) { _data.settings.fairPvp = value; }
 
+        // ── Jornada: afinidade, recrutas, HP, cartões vistos e missões ──────────
+
+        /// <summary>Afinidade do mago; Element.Neutral enquanto não foi escolhida.</summary>
+        public Element Affinity { get { return ParseElement(_data.affinity); } }
+
+        public void SetAffinity(Element element)
+        {
+            if (element == Element.Neutral) throw new ArgumentException("A afinidade precisa ser Fogo, Água ou Planta.");
+            _data.affinity = ElementKey(element);
+        }
+
+        public IReadOnlyList<string> Recruits { get { return _data.recruits; } }
+
+        public void AddRecruit(string charId)
+        {
+            if (_content.Character(charId) == null || _data.recruits.Contains(charId)) return;
+            _data.recruits.Add(charId);
+        }
+
+        /// <summary>HP guardado da jornada, ou -1 se o lutador está com HP cheio.</summary>
+        public int JourneyHp(string charId)
+        {
+            foreach (var entry in _data.journeyHp) if (entry.charId == charId) return entry.hp;
+            return -1;
+        }
+
+        public void SetJourneyHp(string charId, int hp)
+        {
+            if (_content.Character(charId) == null) return;
+            foreach (var entry in _data.journeyHp)
+            {
+                if (entry.charId != charId) continue;
+                entry.hp = Math.Max(0, hp);
+                return;
+            }
+            _data.journeyHp.Add(new HpEntry { charId = charId, hp = Math.Max(0, hp) });
+        }
+
+        public void ClearJourneyHp(string charId) { _data.journeyHp.RemoveAll(e => e.charId == charId); }
+        public void ClearAllJourneyHp() { _data.journeyHp.Clear(); }
+
+        public bool HasSeenStory(string storyId) { return _data.seenStory.Contains(storyId); }
+
+        public void MarkStorySeen(string storyId)
+        {
+            if (!string.IsNullOrEmpty(storyId) && !_data.seenStory.Contains(storyId)) _data.seenStory.Add(storyId);
+        }
+
+        public bool IsMissionDone(string missionId) { return _data.missionsDone.Contains(missionId); }
+
+        public void MarkMissionDone(string missionId)
+        {
+            if (_content.Mission(missionId) != null && !_data.missionsDone.Contains(missionId)) _data.missionsDone.Add(missionId);
+        }
+
+        public static string ElementKey(Element element)
+        {
+            switch (element)
+            {
+                case Element.Fire: return "fire";
+                case Element.Water: return "water";
+                case Element.Plant: return "plant";
+                default: return "";
+            }
+        }
+
+        public static Element ParseElement(string key)
+        {
+            switch (key)
+            {
+                case "fire": return Element.Fire;
+                case "water": return Element.Water;
+                case "plant": return Element.Plant;
+                default: return Element.Neutral;
+            }
+        }
+
         public void Save()
         {
             _store.Save(_data);
@@ -153,11 +230,21 @@ namespace ComboTactics.Game
             if (data.items == null) data.items = new List<ItemStack>();
             if (data.upgrades == null) data.upgrades = new List<UpgradeEntry>();
             if (data.settings == null) data.settings = new SettingsData();
+            if (data.recruits == null) data.recruits = new List<string>();
+            if (data.journeyHp == null) data.journeyHp = new List<HpEntry>();
+            if (data.seenStory == null) data.seenStory = new List<string>();
+            if (data.missionsDone == null) data.missionsDone = new List<string>();
+            if (ParseElement(data.affinity) == Element.Neutral) data.affinity = "";
 
             data.coins = Math.Max(0, data.coins);
             data.campaignStage = Math.Max(0, Math.Min(_content.Opponents.Count, data.campaignStage));
             data.items.RemoveAll(s => s == null || _content.Item(s.id) == null || s.count <= 0);
             data.upgrades.RemoveAll(u => u == null || _content.Character(u.charId) == null);
+            data.recruits.RemoveAll(id => _content.Character(id) == null || !_content.Character(id).Playable);
+            data.journeyHp.RemoveAll(e => e == null || _content.Character(e.charId) == null);
+            foreach (var entry in data.journeyHp) entry.hp = Math.Max(0, entry.hp);
+            data.missionsDone.RemoveAll(id => _content.Mission(id) == null);
+            data.seenStory.RemoveAll(string.IsNullOrEmpty);
             foreach (var entry in data.upgrades)
             {
                 entry.hp = ClampLevel(entry.hp);

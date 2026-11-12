@@ -23,6 +23,9 @@ namespace ComboTactics.Core
         /// <summary>Os efeitos ficam no lutador e continuam valendo no banco (GDD §5.2).</summary>
         public readonly List<ActiveEffect> Effects = new List<ActiveEffect>();
 
+        /// <summary>Verdadeiro depois que a segunda fase (PhaseShiftSpec) foi ativada nesta batalha.</summary>
+        public bool PhaseShifted;
+
         public Fighter(FighterSpec spec) { Spec = spec; Hp = spec.MaxHp; }
 
         public bool IsFainted { get { return Hp <= 0; } }

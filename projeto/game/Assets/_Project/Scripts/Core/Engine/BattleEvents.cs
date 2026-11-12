@@ -135,6 +135,17 @@ namespace ComboTactics.Core
         public Fainted(int side, int fighterIndex) { Side = side; FighterIndex = fighterIndex; }
     }
 
+    /// <summary>
+    /// Um lutador entrou na segunda fase. Os efeitos e a stamina chegam logo depois, como EffectApplied e StaminaChanged.
+    /// </summary>
+    public sealed class PhaseShifted : BattleEvent
+    {
+        public readonly int Side;
+        public readonly int FighterIndex;
+        public readonly string Title;
+        public PhaseShifted(int side, int fighterIndex, string title) { Side = side; FighterIndex = fighterIndex; Title = title; }
+    }
+
     /// <summary>Resultado do sorteio de arena. Pode repetir a arena atual (sorteio uniforme entre as 4).</summary>
     public sealed class ArenaChanged : BattleEvent
     {

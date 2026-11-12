@@ -33,7 +33,8 @@ namespace ComboTactics.Game
                 Scale(def.BaseAttack, multiplier(Stat.Attack)),
                 Scale(def.BaseDefense, multiplier(Stat.Defense)),
                 Scale(def.BaseSpeed, multiplier(Stat.Speed)),
-                skills);
+                skills,
+                def.PhaseShift);
         }
     }
 }

@@ -29,8 +29,14 @@ namespace ComboTactics.Core
 
         public void RequestReaction(IBattleEngine engine, int side, float windowSeconds, Action<ReactionResult> reply)
         {
-            if (!_rng.Chance(_profile.QteChance)) { reply(ReactionResult.Miss); return; }
-            reply(_rng.Chance(_profile.CounterShare) ? ReactionResult.Counter : ReactionResult.Dodge);
+            ReactionResult result = ReactionResult.Miss;
+            if (_rng.Chance(_profile.QteChance))
+                result = _rng.Chance(_profile.CounterShare) ? ReactionResult.Counter : ReactionResult.Dodge;
+
+            // Especiais são mais difíceis de ler: contra eles a IA nunca contra-ataca, no máximo desvia.
+            var skill = engine.PendingSkill;
+            if (skill != null && skill.IsSpecial && result == ReactionResult.Counter) result = ReactionResult.Dodge;
+            reply(result);
         }
 
         public void RequestForcedSwitch(IBattleEngine engine, int side, Action<int> reply)

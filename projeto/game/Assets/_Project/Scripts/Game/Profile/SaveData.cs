@@ -10,7 +10,8 @@ namespace ComboTactics.Game
     [Serializable]
     public class SaveData
     {
-        public const int CurrentVersion = 1;
+        /// <summary>v2: afinidade, espectro, HP da jornada, cartões vistos e missões (11/2026).</summary>
+        public const int CurrentVersion = 2;
 
         public int version = CurrentVersion;
         public int coins;
@@ -19,6 +20,24 @@ namespace ComboTactics.Game
         /// <summary>Quantas fases da campanha já foram vencidas (0 a 4).</summary>
         public int campaignStage;
         public SettingsData settings = new SettingsData();
+
+        /// <summary>Afinidade do mago: "fire", "water", "plant" ou vazio enquanto não foi escolhida (R11).</summary>
+        public string affinity = "";
+        /// <summary>Lutadores trazidos para o espectro por missões secundárias.</summary>
+        public List<string> recruits = new List<string>();
+        /// <summary>HP de cada lutador na jornada da campanha; quem não aparece está com HP cheio.</summary>
+        public List<HpEntry> journeyHp = new List<HpEntry>();
+        /// <summary>Cartões de história já vistos ("prologue", "chapter_0", "finale"...).</summary>
+        public List<string> seenStory = new List<string>();
+        /// <summary>Missões secundárias concluídas.</summary>
+        public List<string> missionsDone = new List<string>();
+    }
+
+    [Serializable]
+    public class HpEntry
+    {
+        public string charId;
+        public int hp;
     }
 
     [Serializable]
