@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using ComboTactics.Core;
+using ComboTactics.Game;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -109,6 +110,19 @@ namespace ComboTactics.UI
                         widget.SetOffset(new Vector2(0f, -30f * t));
                     });
                 }
+                if (_match.Mode == GameMode.Campaign && fainted.Side == 1 && !_lastStandTriggered)
+                {
+                    int alive = 0;
+                    var enemyTeam = _view.Sides[1].Team;
+                    for (int i = 0; i < enemyTeam.Length; i++) if (!enemyTeam[i].Fainted) alive++;
+                    string quote = CampaignStory.Chapter(_match.StageIndex).LastStandQuote;
+                    if (alive == 1 && !string.IsNullOrEmpty(quote))
+                    {
+                        _lastStandTriggered = true;
+                        Say(quote);
+                        yield return Wait(0.55f);
+                    }
+                }
                 yield return Wait(0.35f);
                 yield break;
             }
@@ -143,7 +157,13 @@ namespace ComboTactics.UI
 
             if (e.Skill.IsSpecial)
             {
-                Say("★ GOLPE ESPECIAL! " + Who(e.Side, e.FighterIndex) + " invoca " + e.Skill.Name + "!");
+                string specialMsg = "★ GOLPE ESPECIAL! " + Who(e.Side, e.FighterIndex) + " invoca " + e.Skill.Name + "!";
+                if (_match.Mode == GameMode.Campaign && e.Side == 1)
+                {
+                    string quote = CampaignStory.Chapter(_match.StageIndex).SpecialQuote;
+                    if (!string.IsNullOrEmpty(quote)) specialMsg = quote;
+                }
+                Say(specialMsg);
                 _stage.Shake(8.5f, 0.56f);
                 var flash = Ui.Box(_overlay, "SpecialFlash", 0, 0, Theme.Width, Theme.Height, new Color(0.02f, 0.01f, 0.04f, 0f));
                 var cutIn = Ui.Frame(_overlay, "SpecialCutIn", 220, 178, 840, 96, new Color(0.06f, 0.04f, 0.08f, 0.94f), elemColor, 2.5f);
@@ -660,6 +680,108 @@ namespace ComboTactics.UI
             UnityEngine.Object.Destroy(popup.gameObject);
             widget.SetHp(hpAfter);
             yield return Wait(0.15f);
+
+            if (_match.Mode == GameMode.Campaign && _match.StageIndex == 3 && side == 1 && !_bossPhase2Triggered && hpAfter > 0 && hpAfter <= _view.Sides[1].Active.Spec.MaxHp * 0.5f)
+            {
+                _bossPhase2Triggered = true;
+                yield return PlayBossPhase2Awakening();
+            }
+        }
+
+        /// <summary>Fase 2 do Boss Final (Hyperion): tremor lunar, surto de stamina máxima, buffs de ataque/defesa e fala dramática.</summary>
+        private IEnumerator PlayBossPhase2Awakening()
+        {
+            var bossWidget = _fighters[1];
+            Color eclipseColor = new Color(0.76f, 0.54f, 1.0f, 1f);
+
+            _stage.Shake(14f, 0.85f);
+            Say("O ECLIPSE TOTAL SE COMPLETA! Hyperion desperta sua verdadeira forma cósmica!");
+
+            var banner = Ui.Frame(_overlay, "Phase2Banner", 200, 196, 880, 96, new Color(0.08f, 0.04f, 0.14f, 0.95f), eclipseColor, 2.5f);
+            Ui.Label(banner, "★ DESPERTAR DO TITÃ LUNAR — FASE 2 ★", 16, 10, 848, 40, 28, eclipseColor, TextAnchor.MiddleCenter, FontStyle.Bold, true);
+            Ui.Label(banner, "Stamina Máxima Restaurada  ·  Ataque +10%  ·  Defesa +10%", 16, 50, 848, 32, 16, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold);
+
+            var pillar = SpawnVfx(Art.VfxPillar, bossWidget.CenterX, bossWidget.CenterY, 200f, 340f, eclipseColor);
+            var ring = SpawnVfx(Art.VfxRing, bossWidget.CenterX, bossWidget.CenterY, 140f, 140f, Theme.Gold);
+
+            yield return Tween(0.95f, t =>
+            {
+                float pulse = Mathf.Sin(t * Mathf.PI);
+                bossWidget.SetScale(Mathf.Lerp(1f, 1.16f, pulse));
+                bossWidget.SetTint(Color.Lerp(Color.white, eclipseColor, pulse * 0.7f));
+                PlaceVfx(pillar, bossWidget.CenterX, bossWidget.CenterY - 24f * t, 220f, 360f * pulse, pulse * 0.9f);
+                PlaceVfx(ring, bossWidget.CenterX, bossWidget.CenterY, Mathf.Lerp(140f, 380f, t), Mathf.Lerp(140f, 380f, t), 1f - t);
+            });
+
+            UnityEngine.Object.Destroy(pillar.gameObject);
+            UnityEngine.Object.Destroy(ring.gameObject);
+            UnityEngine.Object.Destroy(banner.parent.gameObject);
+            bossWidget.ResetPose();
+
+            // Aplica os bônus reais de Fase 2 no motor e na cópia visível da batalha.
+            _engine.State.Sides[1].Stamina = _engine.Rules.StaminaMax;
+            _view.Sides[1].Stamina = _engine.Rules.StaminaMax;
+
+            var bossFighter = _engine.State.Sides[1].Active;
+            EffectSpec atkSpec;
+            if (_engine.Catalog.Effects.TryGetValue(BuiltInContent.AttackUp, out atkSpec))
+            {
+                var appliedAtk = EffectSystem.Apply(bossFighter, bossFighter, atkSpec);
+                _view.Sides[1].Active.Effects[atkSpec.Id] = appliedAtk.TurnsLeft;
+            }
+            EffectSpec defSpec;
+            if (_engine.Catalog.Effects.TryGetValue(BuiltInContent.DefenseUp, out defSpec))
+            {
+                var appliedDef = EffectSystem.Apply(bossFighter, bossFighter, defSpec);
+                _view.Sides[1].Active.Effects[defSpec.Id] = appliedDef.TurnsLeft;
+            }
+            RefreshHud();
+
+            yield return PlayStorySequence(new[]
+            {
+                new StoryLine("Hyperion, o Titã Lunar", "Fase 2 · Despertar do Eclipse", BuiltInContent.BossId, Element.Neutral, CharClass.Neutral,
+                    "Vocês ousaram trincar minha armadura mortal?! Contemplem o poder absoluto da Lua Negra: minha Stamina e meu cosmos estão no limite máximo!")
+            });
+        }
+
+        /// <summary>Exibe diálogos da trama integrados à própria arena, avançando com clique, botão ou Espaço/Enter.</summary>
+        private IEnumerator PlayStorySequence(StoryLine[] lines)
+        {
+            if (lines == null || lines.Length == 0) yield break;
+
+            for (int i = 0; i < lines.Length; i++)
+            {
+                var line = lines[i];
+                Say(line.Speaker + ": \"" + line.Text + "\"");
+
+                Color accent = line.Element == Element.Neutral ? Theme.ArenaColor(_view.Arena) : Theme.ElementColor(line.Element);
+                var plaque = Ui.Frame(_overlay, "StoryPlaque", 160, 418, 960, 136, new Color(0.06f, 0.05f, 0.09f, 0.94f), accent, 2.5f);
+
+                var portraitFrame = Ui.Frame(plaque, "PortraitBox", 10, 10, 112, 112, Theme.PanelLight, accent, 2f);
+                Ui.Picture(portraitFrame, "Portrait", Art.Fighter(line.PortraitId, line.Element, line.Class), 4, 4, 100, 100);
+
+                Ui.Label(plaque, line.Speaker.ToUpper(), 136, 10, 640, 26, 20, Theme.Gold, TextAnchor.MiddleLeft, FontStyle.Bold, true);
+                Ui.Label(plaque, line.Title, 136, 34, 640, 20, 13, accent, TextAnchor.MiddleLeft, FontStyle.Bold);
+                Ui.Label(plaque, "\"" + line.Text + "\"", 136, 56, 650, 68, 16, Theme.Text, TextAnchor.UpperLeft, FontStyle.Italic);
+
+                bool next = false;
+                string lastBtn = _view.IsOver ? "Concluir ▸" : "Lutar! ⚔";
+                string btnText = i < lines.Length - 1 ? "Continuar ▸" : lastBtn;
+                Ui.Button(plaque, btnText, 800, 36, 142, 54, () => next = true, Theme.ButtonPrimary, 16);
+                Ui.Label(plaque, "[Clique ou Espaço]", 800, 96, 142, 20, 11, Theme.Muted, TextAnchor.MiddleCenter);
+
+                float elapsed = 0f;
+                while (!next)
+                {
+                    yield return null;
+                    elapsed += Time.unscaledDeltaTime;
+                    if (elapsed > 0.22f && KeyOrMouseDown())
+                        next = true;
+                }
+
+                UnityEngine.Object.Destroy(plaque.parent.gameObject);
+                yield return new WaitForSecondsRealtime(0.06f);
+            }
         }
 
         private IEnumerator PlaySwitch(Switched e)

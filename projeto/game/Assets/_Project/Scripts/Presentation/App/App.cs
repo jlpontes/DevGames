@@ -82,6 +82,7 @@ namespace ComboTactics.UI
         public void StartBattle(MatchRequest request)
         {
             var match = Services.Launcher.Create(request);
+            CampaignStory.EnhanceCampaignMatch(match, Services.Content, Services.Rules);
             Show(new BattleScreen(match));
         }
 

@@ -34,6 +34,8 @@ namespace ComboTactics.UI
         private ReactionResult? _syncedReaction;
         private float _animTimeScale = 1f;
         private bool _syncingReaction;
+        private bool _bossPhase2Triggered;
+        private bool _lastStandTriggered;
         private Text _arenaName;
         private Text _arenaEffect;
         private Text _roundInfo;
@@ -109,7 +111,19 @@ namespace ComboTactics.UI
         private IEnumerator RunBattle(BattleDirector director)
         {
             yield return PlayBattleIntro();
+            if (_match.Mode == GameMode.Campaign)
+                yield return PlayStorySequence(CampaignStory.Chapter(_match.StageIndex).IntroDialogue);
+
             yield return director.Run();
+
+            if (_match.Mode == GameMode.Campaign)
+            {
+                var chapter = CampaignStory.Chapter(_match.StageIndex);
+                if (_engine.WinnerSide == 0)
+                    CampaignStory.RecordStageVictoryTeam(_match.StageIndex, _match.Setup.Teams[0]);
+                yield return PlayStorySequence(_engine.WinnerSide == 0 ? chapter.VictoryDialogue : chapter.DefeatDialogue);
+            }
+
             // Fim: paga as moedas, consome os itens usados, atualiza a campanha e salva (SYSTEM-DESIGN, Fluxo A).
             var result = App.Services.Launcher.Finish(_match, _engine);
             App.ShowResult(_match, result);

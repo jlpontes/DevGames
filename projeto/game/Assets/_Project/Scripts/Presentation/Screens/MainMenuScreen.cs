@@ -51,6 +51,7 @@ namespace ComboTactics.UI
             else
             {
                 App.Services.Profile.Reset();
+                CampaignStory.ClearFatigue();
                 _confirmReset = false;
                 App.Notify("Progresso apagado.");
             }
