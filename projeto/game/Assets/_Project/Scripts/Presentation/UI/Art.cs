@@ -53,9 +53,9 @@ namespace ComboTactics.UI
         /// <summary>Sprite do personagem; sem arquivo para o id, entra a forma gerada por código.</summary>
         public static Texture2D Fighter(string characterId, Element element, CharClass charClass)
         {
-            if (characterId == SummonerId) return ProceduralSummoner();
             Texture2D sprite = LoadSprite(characterId);
-            return sprite != null ? sprite : ProceduralFighter(element, charClass);
+            if (sprite != null) return sprite;
+            return characterId == SummonerId ? ProceduralSummoner() : ProceduralFighter(element, charClass);
         }
 
         /// <summary>Retrato místico do protagonista (Kaelen, o Mago Invocador): manto arcano, olhos astrais e as 3 orbes elementais.</summary>
