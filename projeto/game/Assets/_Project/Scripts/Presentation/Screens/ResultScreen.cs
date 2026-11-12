@@ -41,23 +41,23 @@ namespace ComboTactics.UI
                 string extra;
                 if (_result.CampaignCompleted)
                 {
-                    extra = "★ GRANDE CAMPEÃO DO ECLIPSE! ★\nVocê despertou os 9 Elementares e derrotou Hyperion na Cratera Lunar!";
+                    extra = "★ NOVO GUARDIÃO DO NÚCLEO! ★\nVocê reuniu os 3 Fragmentos ao Núcleo na Lua, restaurou o Cristal Elemental e uniu as 9 Lendas no seu Espectro!";
                 }
                 else if (_result.UnlockedNextStage)
                 {
                     var nextChapter = CampaignStory.Chapter(_match.StageIndex + 1);
-                    extra = "Novo Capítulo Liberado: " + nextChapter.ActTitle + " (" + nextChapter.MasterName + ")!\n" +
+                    extra = "Fragmento Conquistado! Próxima Zona: " + nextChapter.ActTitle + " (" + nextChapter.MasterName + ")!\n" +
                             (nextChapter.NewlySummonedIds.Length > 0
-                                ? "✦ O Selo conquistado despertará +3 novos Espíritos Elementares na próxima Cutscene!"
-                                : "✦ Todos os 9 Elementares estão prontos para o confronto final na Lua!");
+                                ? "✦ O Fragmento conquistado integrará +3 novas Lendas ao seu Espectro na próxima Cutscene!"
+                                : "✦ Os 3 Fragmentos estão reunidos! Todas as 9 Lendas estão prontas para o teste final na Lua!");
                 }
                 else if (!_result.PlayerWon)
                 {
-                    extra = "Seus Elementares recuaram para o Grimório.\nCure seus guerreiros no Altar ou evolua seus atributos na Loja antes de tentar novamente!";
+                    extra = "Suas lendas recuaram para o Espectro.\nCure seus lutadores no Santuário do Cristal ou evolua seus atributos na Loja antes de tentar novamente!";
                 }
                 else
                 {
-                    extra = "Capítulo concluído! Seu progresso e o estado do Grimório foram salvos.";
+                    extra = "Provação concluída! Seu progresso e o estado do Espectro foram salvos.";
                 }
 
                 Ui.Label(panel.transform, extra, 40, 196, 774, 68, 17, Theme.Text, TextAnchor.MiddleCenter, FontStyle.Bold);
@@ -71,13 +71,13 @@ namespace ComboTactics.UI
 
                 if (_result.PlayerWon && !_result.CampaignCompleted)
                 {
-                    Ui.Button(panel.transform, "Ver Grimório", 48, 396, 210, 68, App.ShowCampaign, Theme.Button, 20);
+                    Ui.Button(panel.transform, "Ver Espectro", 48, 396, 210, 68, App.ShowCampaign, Theme.Button, 20);
                     Ui.Button(panel.transform, "Loja & Evolução", 274, 396, 220, 68, App.ShowStore, Theme.Button, 20);
-                    Ui.Button(panel.transform, "▶ Próximo Ato (História)", 510, 396, 300, 68, App.ContinueCampaignStory, Theme.ButtonPrimary, 21);
+                    Ui.Button(panel.transform, "▶ Próxima Fase (História)", 510, 396, 300, 68, App.ContinueCampaignStory, Theme.ButtonPrimary, 21);
                 }
                 else
                 {
-                    Ui.Button(panel.transform, "Voltar ao Grimório", 96, 396, 310, 68, App.ShowCampaign, Theme.ButtonPrimary, 22);
+                    Ui.Button(panel.transform, "Voltar à Jornada", 96, 396, 310, 68, App.ShowCampaign, Theme.ButtonPrimary, 22);
                     Ui.Button(panel.transform, "Loja & Evolução", 448, 396, 310, 68, App.ShowStore, Theme.Button, 22);
                 }
             }

@@ -55,12 +55,12 @@ namespace ComboTactics.UI
             string title = IsPvp
                 ? "Equipe " + (_player + 1) + " — Jogador " + (_player + 1)
                 : IsCampaign
-                    ? CampaignStory.Chapter(_request.StageIndex).ActTitle + " · Grimório de Invocação"
+                    ? CampaignStory.Chapter(_request.StageIndex).ActTitle + " · Espectro do Mago"
                     : "Seleção de Personagens";
             Ui.Label(Root, title, 30, 10, 780, 40, 30, Theme.Gold, TextAnchor.MiddleLeft, FontStyle.Bold, true);
 
             string sub = IsCampaign
-                ? "Invocador Kaelen: escolha 3 Elementares vivos. Quem ficar no Grimório recupera +50% HP ao vencer a fase!"
+                ? "O Mago: escolha 3 lendas vivas do seu Espectro. Quem descansar recupera +50% HP ao vencer a fase!"
                 : "Escolha " + teamSize + " lutadores para a arena. O 1º escolhido inicia o combate.";
             Ui.Label(Root, sub, 30, 48, 790, 24, 14, Theme.Text, TextAnchor.MiddleLeft, FontStyle.Bold);
 
@@ -219,7 +219,7 @@ namespace ComboTactics.UI
             {
                 int actNum = CampaignStory.GetUnlockChapterNumber(def.Id);
                 var lockBanner = Ui.Frame(t, "LockBanner", 8, 124, 246, 30, new Color(0.08f, 0.06f, 0.14f, 0.96f), Theme.BorderGold, 1.5f);
-                Ui.Label(lockBanner, "🔒 DESPERTA NO ATO " + actNum + " DA HISTÓRIA", 4, 0, 234, 26, 11, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold);
+                Ui.Label(lockBanner, "🔒 UNE-SE AO ESPECTRO NA FASE " + actNum, 4, 0, 234, 26, 11, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold);
             }
             else if (IsCampaign && isDamaged)
             {
@@ -275,9 +275,9 @@ namespace ComboTactics.UI
                 string bonus = _request.StageIndex == 3
                     ? "Boss 2 Fases (Desperta <50% HP)"
                     : "Atributos +" + Mathf.RoundToInt((float)chapter.ChallengingStatBonus * 100f) + "%";
-                return "Mestre: " + chapter.MasterName + " (" + bonus + ")\n" +
-                       "Arena: " + arena.Name + " (" + Theme.ArenaEffect(arena, services.Rules) + ")\n" +
-                       "Dano Persistente: o HP final fica salvo; reservas no Grimório curam +50% HP!";
+                return "Guardião: " + chapter.MasterName + " (" + bonus + ")\n" +
+                       "Zona: " + arena.Name + " (" + Theme.ArenaEffect(arena, services.Rules) + ")\n" +
+                       "Dano Persistente: o HP final fica salvo; reservas no Espectro curam +50% HP!";
             }
             if (_request.Mode == GameMode.VsAi)
                 return "Oponente: IA " + services.Content.AiProfiles[_request.DifficultyId].Name + "\nEquipe e arena inicial sorteadas.";

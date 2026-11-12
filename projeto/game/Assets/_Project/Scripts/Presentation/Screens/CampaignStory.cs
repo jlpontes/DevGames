@@ -27,18 +27,35 @@ namespace ComboTactics.UI
         }
     }
 
-    /// <summary>Cena de uma Cutscene cinematográfica entre os capítulos da História.</summary>
+    public enum CutsceneVisualKind
+    {
+        GuardianConfrontation,
+        CrystalWhole,
+        CrystalShatter,
+        AffinityChoice,
+        SpectrumUnlock
+    }
+
+    /// <summary>Cena de uma Cutscene cinematográfica dirigida pelo Story Director conforme o GDD e o Caderno.</summary>
     public sealed class CutsceneSlide
     {
         public readonly ArenaId BackdropArena;
+        public readonly CutsceneVisualKind VisualKind;
         public readonly string HeaderTitle;
         public readonly string Narration;
         public readonly StoryLine Dialogue;
         public readonly string[] SummonedElementals;
 
-        public CutsceneSlide(ArenaId backdropArena, string headerTitle, string narration, StoryLine dialogue, string[] summonedElementals = null)
+        public CutsceneSlide(
+            ArenaId backdropArena,
+            CutsceneVisualKind visualKind,
+            string headerTitle,
+            string narration,
+            StoryLine dialogue,
+            string[] summonedElementals = null)
         {
             BackdropArena = backdropArena;
+            VisualKind = visualKind;
             HeaderTitle = headerTitle;
             Narration = narration;
             Dialogue = dialogue;
@@ -46,10 +63,11 @@ namespace ComboTactics.UI
         }
     }
 
-    /// <summary>Dados narrativos, cutscenes, elementares despertados e desafio de cada capítulo da Campanha.</summary>
+    /// <summary>Dados narrativos, cutscenes, fragmentos do Cristal e desafio de cada fase da Campanha.</summary>
     public sealed class StageNarrative
     {
         public readonly int StageIndex;
+        public readonly Element ZoneElement;
         public readonly string ActTitle;
         public readonly string MasterName;
         public readonly string MasterTitle;
@@ -68,6 +86,7 @@ namespace ComboTactics.UI
 
         public StageNarrative(
             int stageIndex,
+            Element zoneElement,
             string actTitle,
             string masterName,
             string masterTitle,
@@ -85,6 +104,7 @@ namespace ComboTactics.UI
             StoryLine[] defeat)
         {
             StageIndex = stageIndex;
+            ZoneElement = zoneElement;
             ActTitle = actTitle;
             MasterName = masterName;
             MasterTitle = masterTitle;
@@ -104,310 +124,388 @@ namespace ComboTactics.UI
     }
 
     /// <summary>
-    /// Gerencia a jornada contínua do Modo História ("O Grimório do Eclipse"):
-    /// - Protagonista: Kaelen, o Mago Invocador que desperta e comanda os Guerreiros Elementares;
-    /// - Conquista progressiva dos Elementares (3 no Ato I -> +3 no Ato II -> +3 no Ato III = 9 no Boss);
-    /// - Dano Persistente entre as fases, descanso de +50% HP no Grimório para quem fica no banco e Cura no Santuário;
-    /// - Cutscenes cinematográficas de cada Ato e Epílogo com salvamento automático.
+    /// Diretor de História (Story Director) do Modo História fiel ao GDD e ao Caderno (Páginas 2, 3, 5 e 8, e R9–R11):
+    /// - O Cristal Elemental se rompeu e seus fragmentos criaram as zonas elementais: Vulcão (Fogo), Mar (Água) e Floresta (Planta),
+    ///   despertando as 9 lendas locais, enquanto o Núcleo sem elemento foi parar na Lua e deixou a gravidade pesada.
+    /// - O jogador é o Mago lançador de feitiços que escolhe sua Afinidade Elemental (Fogo, Água ou Planta) e comanda seu Espectro.
+    /// - Os Guardiões protegem os fragmentos e o núcleo (não são vilões!) e testam se o Mago é digno de restaurar o Cristal Elemental.
     /// </summary>
     public static class CampaignStory
     {
-        public const string SummonerName = "Kaelen, o Mago Invocador";
-        public const string SummonerTitle = "Guardião do Grimório Astral";
+        public const string SummonerName = "O Mago";
+        public const string SummonerTitle = "Lançador de Feitiços · Portador do Espectro";
 
         public const int HealSingleCost = 25;
         public const int HealAllCost = 60;
 
-        private const string FatiguePrefsKey = "ComboTactics.CampaignFatigue";
-        private const string FatigueStagePrefsKey = "ComboTactics.CampaignFatigueStage";
+        private const string AffinityPrefsKey = "ComboTactics.CampaignAffinity";
         private const string HpPrefsKey = "ComboTactics.CampaignHp";
         private const string CutsceneMaskPrefsKey = "ComboTactics.CampaignCutsceneMask";
         private const string RestReportPrefsKey = "ComboTactics.CampaignLastRestReport";
 
-        // ── Grupos de Elementares despertados a cada Ato ─────────────────────────
-        private static readonly string[] Tier0Elementals = { "water_warrior", "plant_tank", "fire_mage" };
-        private static readonly string[] Tier1Elementals = { "fire_warrior", "plant_mage", "water_tank" };
-        private static readonly string[] Tier2Elementals = { "plant_warrior", "water_mage", "fire_tank" };
+        public static readonly string[] FireElementals = { "fire_warrior", "fire_mage", "fire_tank" };
+        public static readonly string[] WaterElementals = { "water_warrior", "water_mage", "water_tank" };
+        public static readonly string[] PlantElementals = { "plant_warrior", "plant_mage", "plant_tank" };
 
-        private static readonly StageNarrative[] Chapters =
+        // ── Escolha de Afinidade Elemental do Mago (GDD R11) ─────────────────────
+
+        public static bool HasChosenAffinity()
         {
-            // ── ATO I (FASE 0 · VULCÃO) ──────────────────────────────────────────
-            new StageNarrative(
-                0,
-                "Ato I · O Pacto Primordial",
-                "Ignis, Mestre da Forja",
-                "Guardião da Cratera Vulcânica",
-                "Selo da Cinza Ardente",
-                "Como último Mago Invocador, você despertou os 3 primeiros Espíritos do Grimório. Vença Ignis para conquistar o 1º Selo e libertar novos Elementares!",
-                Tier0Elementals,
-                new[]
-                {
-                    new CutsceneSlide(
-                        ArenaId.Moon,
-                        "PRÓLOGO · A SOMBRA DE HYPERION",
-                        "No alto da Cratera Lunar, o Titã Hyperion rompeu os grilhões ancestrais e iniciou o Eclipse Eterno, drenando a mana dos três elementos do mundo.",
-                        new StoryLine(SummonerName, SummonerTitle, Art.SummonerId, Element.Neutral, CharClass.Mage,
-                            "O sol está sendo engolido pela Lua Negra... Os exércitos mortais caíram, mas o Grimório Astral em minhas mãos ainda pulsa com a memória dos Espíritos Elementares.")
-                    ),
-                    new CutsceneSlide(
-                        ArenaId.Volcano,
-                        "O RITUAL DE INVOCAÇÃO INICIAL",
-                        "Diante do Altar das Cinzas, você traça o círculo rúnico. Três luzes — Água, Planta e Fogo — respondem ao seu chamado e assumem forma física!",
-                        new StoryLine(SummonerName, "Pacto da Tríade Primordial", Art.SummonerId, Element.Fire, CharClass.Mage,
-                            "Despertem, Guerreiro de Água, Tanque de Planta e Mago de Fogo! Nossa energia vital é compartilhada: cada ferimento que sofrerem persistirá na jornada até descansarem no Grimório!"),
-                        Tier0Elementals
-                    ),
-                    new CutsceneSlide(
-                        ArenaId.Volcano,
-                        "ATO I · A FORJA DO PRIMEIRO SELO",
-                        "Para libertar os demais espíritos aprisionados nos cristais do mundo, você precisa tomar o Selo da Cinza das mãos de Ignis, o Mestre da Forja.",
-                        new StoryLine("Ignis, Mestre da Forja", "Guardião da Cratera Vulcânica", "fire_warrior", Element.Fire, CharClass.Warrior,
-                            "Um Mago Invocador com apenas três espíritos no Grimório? Se quiser os elementares adormecidos nesta cratera, prove que seu comando suporta o calor do meu Vulcão!")
-                    )
-                },
-                0.12,
-                new AIProfile("campaign_fire", "Ignis (Mestre de Fogo)", 0.25, 0.65, 2, 0.35, 0.25, 0.05),
-                new Dictionary<string, int> { { BuiltInContent.MedKit, 1 }, { BuiltInContent.AttackPotion, 1 } },
-                new[]
-                {
-                    new StoryLine("Ignis, Mestre da Forja", "Guardião do 1º Selo", "fire_warrior", Element.Fire, CharClass.Warrior,
-                        "Então você é Kaelen, o Invocador do Grimório Astral? Faz séculos que ninguém ousa conjurar espíritos na minha forja!"),
-                    new StoryLine(SummonerName, SummonerTitle, Art.SummonerId, Element.Neutral, CharClass.Mage,
-                        "Ignis, o Eclipse de Hyperion vai consumir até o seu magma se não unirmos os Selos. Em guarda — meus três Elementares abrirão caminho!")
-                },
-                "Ignis: 'Sintam a fúria do magma primordial! Cinzas ao vento!'",
-                "Ignis: 'Minha forja ainda queima! Não entregarei o Selo sem lutar até o fim!'",
-                new[]
-                {
-                    new StoryLine("Ignis, Mestre da Forja", "Selo da Cinza Conquistado", "fire_warrior", Element.Fire, CharClass.Warrior,
-                        "Seu vínculo com os espíritos é verdadeiro, Invocador. Tome o Selo da Cinza — ele despertará três novos guerreiros elementares no seu Grimório!"),
-                    new StoryLine(SummonerName, SummonerTitle, Art.SummonerId, Element.Neutral, CharClass.Mage,
-                        "Sinto o poder fluindo para as páginas do Grimório! Meus guerreiros feridos poderão descansar enquanto invoco os novos espíritos no Santuário Oceânico.")
-                },
-                new[]
-                {
-                    new StoryLine("Ignis, Mestre da Forja", "Chamas da Forja", "fire_mage", Element.Fire, CharClass.Mage,
-                        "Seus espíritos recuaram para o Grimório. Canalize sua mana no Santuário e volte quando sua estratégia estiver afiada!")
-                }
-            ),
+            return PlayerPrefs.HasKey(AffinityPrefsKey);
+        }
 
-            // ── ATO II (FASE 1 · MAR) ────────────────────────────────────────────
-            new StageNarrative(
-                1,
-                "Ato II · O Despertar das Marés",
-                "Nereu, Senhor das Marés",
-                "Guardião do Santuário Oceânico",
-                "Selo da Maré Profunda",
-                "O 1º Selo despertou +3 novos Elementares! Enquanto seus feridos do Vulcão se recuperam, lidere sua nova formação contra Nereu.",
-                Tier1Elementals,
-                new[]
-                {
-                    new CutsceneSlide(
-                        ArenaId.Volcano,
-                        "O PACTO DO SELO DA CINZA",
-                        "Ao cravar o Selo da Cinza no Grimório Astral, correntes de fogo, esporos e marés se rompem. Três novos Espíritos Elementares emergem para servir ao seu comando!",
-                        new StoryLine(SummonerName, "Novos Elementares Vinculados!", Art.SummonerId, Element.Water, CharClass.Mage,
-                            "Guerreiro de Fogo, Mago de Planta e Tanque de Água responderam ao chamado! Eles chegam com força total, enquanto os que lutaram no Vulcão mantêm suas cicatrizes de batalha."),
-                        Tier1Elementals
-                    ),
-                    new CutsceneSlide(
-                        ArenaId.Sea,
-                        "ATO II · RUMO AO SANTUÁRIO ABISSAL",
-                        "Nas águas turbulentas do Santuário Oceânico, Nereu guarda o segundo Selo. Quem você deixar descansando fora desta batalha recuperará 50% de vida nas páginas do Grimório!",
-                        new StoryLine("Nereu, Senhor das Marés", "Guardião do 2º Selo", "water_mage", Element.Water, CharClass.Mage,
-                            "Vejo que seu Grimório ganhou novas páginas, Kaelen... Mas seus primeiros guerreiros estão feridos da forja de Ignis. Veremos como você gerencia suas invocações sob a pressão do oceano!")
-                    )
-                },
-                0.22,
-                new AIProfile("campaign_water", "Nereu (Mestre da Água)", 0.28, 0.80, 2, 0.48, 0.30, 0.02),
-                new Dictionary<string, int> { { BuiltInContent.MedKit, 1 }, { BuiltInContent.Medicine, 1 }, { BuiltInContent.DefensePotion, 1 } },
-                new[]
-                {
-                    new StoryLine("Nereu, Senhor das Marés", "Guardião do 2º Selo", "water_mage", Element.Water, CharClass.Mage,
-                        "As marés já sentem a gravidade da Lua Negra. Mostre-me os espíritos que você escolheu invocar para enfrentar meu abismo!"),
-                    new StoryLine(SummonerName, SummonerTitle, Art.SummonerId, Element.Neutral, CharClass.Mage,
-                        "Enquanto meus veteranos meditam no Grimório para curar suas feridas, meus novos Elementares quebrarão a sua correnteza, Nereu!")
-                },
-                "Nereu: 'O abismo se abre! Nenhuma invocação resiste à pressão do oceano!'",
-                "Nereu: 'Como um maremoto em alto-mar, minha última onda será implacável!'",
-                new[]
-                {
-                    new StoryLine("Nereu, Senhor das Marés", "Selo do Abismo Conquistado", "water_mage", Element.Water, CharClass.Mage,
-                        "Magnífico controle tático, Invocador! Leve o Selo da Maré Profunda — com ele, os três últimos espíritos ancestrais despertarão no seu Grimório!")
-                },
-                new[]
-                {
-                    new StoryLine("Nereu, Senhor das Marés", "Tragados pela Maré", "water_tank", Element.Water, CharClass.Tank,
-                        "A correnteza superou sua formação. Cure seus Elementares no Santuário e reorganize seu Grimório!")
-                }
-            ),
-
-            // ── ATO III (FASE 2 · FLORESTA) ──────────────────────────────────────
-            new StageNarrative(
-                2,
-                "Ato III · O Grimório Completo",
-                "Sylvan, Arcano da Mata",
-                "Guardião da Floresta Viva",
-                "Selo da Raiz Eterna",
-                "Os 9 Elementares agora estão despertos no seu Grimório! Gerencie a vida da sua tropa e supere a guarda de elite de Sylvan (+35% de poder).",
-                Tier2Elementals,
-                new[]
-                {
-                    new CutsceneSlide(
-                        ArenaId.Sea,
-                        "O DESPERTAR DOS NOVE ELEMENTARES",
-                        "A luz do Selo do Abismo preenche as últimas páginas em branco do Grimório Astral. Os três campeões supremos da Floresta, do Mar e do Vulcão se ajoelham diante de você!",
-                        new StoryLine(SummonerName, "Grimório Completo (9/9 Elementares)", Art.SummonerId, Element.Plant, CharClass.Mage,
-                            "Guerreiro de Planta, Mago de Água e Tanque de Fogo estão vinculados! Além disso, os espíritos que descansaram na última batalha recuperaram suas forças no Grimório!"),
-                        Tier2Elementals
-                    ),
-                    new CutsceneSlide(
-                        ArenaId.Forest,
-                        "ATO III · O PROVAÇÃO DA FLORESTA VIVA",
-                        "Com os 9 Elementares ao seu dispor, você adentra a Floresta Viva. Sylvan, o Arcano da Mata, protege o último selo terreno antes do portal lunar.",
-                        new StoryLine("Sylvan, Arcano da Mata", "Guardião do 3º Selo", "plant_mage", Element.Plant, CharClass.Mage,
-                            "Nove espíritos elementares sob o comando de um único Mago... Mas cuidado, Kaelen: o dano desta batalha será carregado direto para o confronto contra o Titã Lunar!")
-                    )
-                },
-                0.35,
-                new AIProfile("campaign_plant", "Sylvan (Mestre de Planta)", 0.32, 0.90, 2, 0.62, 0.35, 0.00),
-                new Dictionary<string, int> { { BuiltInContent.MedKit, 2 }, { BuiltInContent.Medicine, 1 } },
-                new[]
-                {
-                    new StoryLine("Sylvan, Arcano da Mata", "Guardião do 3º Selo", "plant_mage", Element.Plant, CharClass.Mage,
-                        "Aqui cada raiz drena sua vitalidade e cada espinho deixa marcas para a próxima batalha. Mostre a sabedoria digna do Grande Invocador!"),
-                    new StoryLine(SummonerName, SummonerTitle, Art.SummonerId, Element.Neutral, CharClass.Mage,
-                        "Meus nove Elementares lutam como um só corpo e uma só alma. Conquistaremos o Selo da Raiz e abriremos o portal para a Lua!")
-                },
-                "Sylvan: 'Florestas milenares, ergam-se e esmaguem as invocações!'",
-                "Sylvan: 'Enquanto minhas raízes tocarem o solo, a mata jamais cairá!'",
-                new[]
-                {
-                    new StoryLine("Sylvan, Arcano da Mata", "Os Três Selos Reunidos!", "plant_warrior", Element.Plant, CharClass.Warrior,
-                        "Os Três Selos ressoam com seu Grimório! O portal para a Cratera da Lua se abriu... Cure e prepare seus melhores guerreiros para o Titã Hyperion!")
-                },
-                new[]
-                {
-                    new StoryLine("Sylvan, Arcano da Mata", "Enraizados na Floresta", "plant_mage", Element.Plant, CharClass.Mage,
-                        "O veneno e os espinhos cobraram seu preço. Visite o Santuário ou a Loja antes de desafiar a mata novamente.")
-                }
-            ),
-
-            // ── ATO FINAL (FASE 3 · LUA / BOSS) ──────────────────────────────────
-            new StageNarrative(
-                3,
-                "Ato Final · O Eclipse Total",
-                "Hyperion, o Titã Lunar",
-                "Soberano do Eclipse Eterno",
-                "Coroa do Eclipse",
-                "Na Cratera Lunar, você e seus Elementares enfrentam Hyperion. Ao cair abaixo de 50% de HP, o Titã desperta sua Fase 2 Cósmica!",
-                new string[0],
-                new[]
-                {
-                    new CutsceneSlide(
-                        ArenaId.Moon,
-                        "A ASCENSÃO À CRATERA LUNAR",
-                        "Os selos do Fogo, da Água e da Floresta abrem uma ponte astral até a superfície da Lua. A gravidade invertida faz os lentos golpearem como meteoros.",
-                        new StoryLine(SummonerName, SummonerTitle, Art.SummonerId, Element.Neutral, CharClass.Mage,
-                            "Chegamos ao coração do Eclipse. Os espíritos que descansaram na Floresta recuperaram energia, e todo o poder do Grimório está pronto para o duelo final!")
-                    ),
-                    new CutsceneSlide(
-                        ArenaId.Moon,
-                        "ATO FINAL · O TITÃ DO ECLIPSE",
-                        "No centro do altar gravitacional, Hyperion se ergue com o triplo da vitalidade de um guerreiro comum e uma armadura capaz de despertar uma segunda forma cósmica.",
-                        new StoryLine("Hyperion, o Titã Lunar", "Soberano do Eclipse Eterno", BuiltInContent.BossId, Element.Neutral, CharClass.Neutral,
-                            "Um Mago Invocador ousou subir até o meu trono com nove fagulhas elementais?! Venha, Kaelen — apagarei seu Grimório e mergulharei seu mundo na noite eterna!")
-                    )
-                },
-                0.18,
-                new AIProfile("campaign_boss", "Hyperion (Titã Lunar)", 0.00, 0.00, 2, 0.38, 0.30, 0.00),
-                new Dictionary<string, int> { { BuiltInContent.Medicine, 2 }, { BuiltInContent.AttackPotion, 1 } },
-                new[]
-                {
-                    new StoryLine("Hyperion, o Titã Lunar", "Soberano do Eclipse", BuiltInContent.BossId, Element.Neutral, CharClass.Neutral,
-                        "Aqui na Lua, nem Fogo, nem Água, nem Planta possuem vantagem natural. Apenas o domínio absoluto do tempo e da gravidade decide quem sobrevive!"),
-                    new StoryLine(SummonerName, SummonerTitle, Art.SummonerId, Element.Neutral, CharClass.Mage,
-                        "Nós atravessamos o Vulcão, o Abismo e a Floresta carregando cada cicatriz até aqui. Guerreiros do Grimório: última invocação, ATAQUEM!")
-                },
-                "Hyperion: 'CURVEM-SE PERANTE A GRAVIDADE DO ECLIPSE TOTAL!'",
-                "",
-                new[]
-                {
-                    new StoryLine("Hyperion, o Titã Lunar", "O Eclipse se Dissipa", BuiltInContent.BossId, Element.Neutral, CharClass.Neutral,
-                        "Impossível... Mesmo após o meu despertar cósmico, o laço entre o Invocador e seus nove Elementares despedaçou a Lua Negra..."),
-                    new StoryLine(SummonerName, "Grande Campeão do Eclipse!", Art.SummonerId, Element.Neutral, CharClass.Mage,
-                        "O Eclipse terminou! A luz voltou às três arenas e nossos espíritos elementares estão livres em harmonia eterna!")
-                },
-                new[]
-                {
-                    new StoryLine("Hyperion, o Titã Lunar", "A Noite Eterna", BuiltInContent.BossId, Element.Neutral, CharClass.Neutral,
-                        "Suas invocações se despedaçaram contra minha gravidade lunar. O Eclipse reinará absoluto!")
-                }
-            ),
-        };
-
-        private static readonly CutsceneSlide[] EpilogueCutscene =
+        public static Element GetPlayerAffinity()
         {
-            new CutsceneSlide(
-                ArenaId.Moon,
-                "EPÍLOGO · A AURORA DOS TRÊS REINOS",
-                "Com a queda de Hyperion, a sombra da Lua Negra se desfaz no firmamento. A luz dourada volta a banhar a Cratera do Vulcão, o Santuário Oceânico e a Floresta Viva.",
-                new StoryLine(SummonerName, "Mestre Supremo do Grimório", Art.SummonerId, Element.Neutral, CharClass.Mage,
-                    "Cada batalha, cada ferimento e cada pacto valeram a pena. Vocês nove lutaram ao meu lado quando o mundo inteiro havia perdido a esperança."),
-                Tier0Elementals
-            ),
-            new CutsceneSlide(
-                ArenaId.Forest,
-                "A LENDA DO MAGO INVOCADOR",
-                "Ignis, Nereu e Sylvan saúdam o seu nome. Seu Grimório Astral permanece completo com os 9 Elementares, pronto para qualquer novo desafio nas arenas!",
-                new StoryLine(SummonerName, "Grande Campeão das Arenas", Art.SummonerId, Element.Plant, CharClass.Mage,
-                    "A harmonia entre Fogo, Água e Planta foi restaurada. Sempre que as arenas chamarem, meu Grimório responderá!"),
-                Tier2Elementals
-            )
-        };
+            int raw = PlayerPrefs.GetInt(AffinityPrefsKey, (int)Element.Water);
+            if (raw != (int)Element.Fire && raw != (int)Element.Water && raw != (int)Element.Plant)
+                return Element.Water;
+            return (Element)raw;
+        }
+
+        public static void SetPlayerAffinity(Element element)
+        {
+            PlayerPrefs.SetInt(AffinityPrefsKey, (int)element);
+            PlayerPrefs.Save();
+        }
+
+        public static string[] GetElementalsFor(Element element)
+        {
+            switch (element)
+            {
+                case Element.Fire: return FireElementals;
+                case Element.Plant: return PlantElementals;
+                default: return WaterElementals;
+            }
+        }
+
+        // ── Capítulos Canônicos (GDD R10 & Caderno p.2, 5, 8) ────────────────────
 
         public static StageNarrative Chapter(int stageIndex)
         {
-            int idx = Mathf.Clamp(stageIndex, 0, Chapters.Length - 1);
-            return Chapters[idx];
+            Element affinity = GetPlayerAffinity();
+            string[] initialSpectrum = GetElementalsFor(affinity);
+
+            switch (Mathf.Clamp(stageIndex, 0, 3))
+            {
+                case 0:
+                    return new StageNarrative(
+                        0,
+                        Element.Fire,
+                        "Fase 1 · O Fragmento do Vulcão",
+                        "Guardião do Vulcão",
+                        "Protetor do Fragmento de Fogo",
+                        "Fragmento do Vulcão",
+                        "Onde o fragmento rubro do Cristal Elemental caiu nasceu o Vulcão e despertaram a Mula sem Cabeça, o Bruxo-Fênix e o Dragão. Prove seu valor ao Guardião!",
+                        FireElementals,
+                        new[]
+                        {
+                            new CutsceneSlide(
+                                ArenaId.Forest,
+                                CutsceneVisualKind.CrystalWhole,
+                                "PRÓLOGO · O CRISTAL ELEMENTAL",
+                                "Por eras, o Cristal Elemental manteve Fogo, Água e Planta em perfeito equilíbrio — até que uma fissura primordial o rompeu e espalhou seus fragmentos pelo mundo.",
+                                new StoryLine(SummonerName, SummonerTitle, Art.SummonerId, Element.Neutral, CharClass.Mage,
+                                    "Mesmo sendo um mago novato, sinto o desequilíbrio do Cristal Elemental ecoar em cada feitiço. Preciso partir em jornada para reunir seus fragmentos!")
+                            ),
+                            new CutsceneSlide(
+                                ArenaId.Volcano,
+                                CutsceneVisualKind.CrystalShatter,
+                                "O NASCIMENTO DAS ZONAS E DO NÚCLEO LUNAR",
+                                "Onde cada fragmento caiu nasceu uma zona elemental — o Vulcão (Fogo), o Mar (Água) e a Floresta (Planta) — despertando 9 lendas locais. O Núcleo sem elemento foi parar na Lua, tornando-a pesada!",
+                                new StoryLine("Guardião do Núcleo", "Sentinela Nascido do Núcleo", BuiltInContent.BossId, Element.Neutral, CharClass.Neutral,
+                                    "Os Guardiões das zonas não são vilões: nós protegemos os fragmentos do Cristal e testamos se há um mago digno de reunificá-lo.")
+                            ),
+                            new CutsceneSlide(
+                                ArenaId.Sea,
+                                CutsceneVisualKind.AffinityChoice,
+                                "AFINIDADE ELEMENTAL & ESPECTRO INICIAL (GDD R11)",
+                                "Sintonize sua Afinidade Elemental (Fogo, Água ou Planta) para despertar as 3 primeiras lendas do seu Espectro! A cada Guardião vencido, o fragmento e as lendas da zona se unem a você.",
+                                new StoryLine(SummonerName, "Escolha sua Afinidade acima ou mantenha a atual", Art.SummonerId, affinity, CharClass.Mage,
+                                    "Minha afinidade com " + Theme.ElementName(affinity) + " desperta meus 3 primeiros aliados no Espectro! Seguirei a trilha: Vulcão, Mar, Floresta e Lua!"),
+                                initialSpectrum
+                            ),
+                            new CutsceneSlide(
+                                ArenaId.Volcano,
+                                CutsceneVisualKind.GuardianConfrontation,
+                                "FASE 1 · O TESTE DO GUARDIÃO DO VULCÃO",
+                                "Na Cratera Vulcânica criada pelo Fragmento de Fogo, o calor favorece personagens de Fogo (+10%) e prejudica os de Planta (-10%). O Guardião aguarda com as 3 lendas vulcânicas.",
+                                new StoryLine("Guardião do Vulcão", "Protetor do Fragmento de Fogo", "fire_warrior", Element.Fire, CharClass.Warrior,
+                                    "Aproxime-se, jovem mago. Só confiarei o Fragmento do Vulcão e as lendas desta cratera a quem provar sabedoria e domínio tático na arena!")
+                            )
+                        },
+                        0.12,
+                        new AIProfile("campaign_fire", "Guardião do Vulcão", 0.25, 0.65, 2, 0.35, 0.25, 0.05),
+                        new Dictionary<string, int> { { BuiltInContent.MedKit, 1 }, { BuiltInContent.AttackPotion, 1 } },
+                        new[]
+                        {
+                            new StoryLine("Guardião do Vulcão", "Protetor do Fragmento de Fogo", "fire_warrior", Element.Fire, CharClass.Warrior,
+                                "A energia do fragmento rubro despertou a Mula sem Cabeça, o Bruxo-Fênix e o Dragão. Mostre como você comanda seu Espectro sob o calor do Vulcão!"),
+                            new StoryLine(SummonerName, SummonerTitle, Art.SummonerId, affinity, CharClass.Mage,
+                                "Não vim para destruir, Guardião, mas para provar que posso restaurar o Cristal Elemental. Espectro, em posição!")
+                        },
+                        "Guardião do Vulcão: 'Que o fogo primordial do fragmento ponha à prova a sua estratégia!'",
+                        "Guardião do Vulcão: 'Permanece firme diante do magma? Então enfrente minha última chama!'",
+                        new[]
+                        {
+                            new StoryLine("Guardião do Vulcão", "Fragmento do Vulcão Entregue!", "fire_warrior", Element.Fire, CharClass.Warrior,
+                                affinity == Element.Fire
+                                    ? "Sua chama interior é sábia e justa! Como as lendas do Fogo já caminham no seu Espectro desde o início, receba o Fragmento do Vulcão com minha bênção!"
+                                    : "Notável domínio tático, jovem mago! Receba o Fragmento do Vulcão — a partir de agora, a Mula sem Cabeça, o Bruxo-Fênix e o Dragão passam para o seu Espectro!"),
+                            new StoryLine(SummonerName, SummonerTitle, Art.SummonerId, affinity, CharClass.Mage,
+                                "O primeiro Fragmento do Cristal Elemental está conosco! Seguirei para a zona do Mar em busca do segundo Fragmento.")
+                        },
+                        new[]
+                        {
+                            new StoryLine("Guardião do Vulcão", "Conselho da Forja", "fire_mage", Element.Fire, CharClass.Mage,
+                                "O ímpeto sem preparo é consumido pela lava. Cure seu Espectro no Santuário, estude as vantagens de elemento e classe e retorne para refazer o teste!")
+                        }
+                    );
+
+                case 1:
+                    return new StageNarrative(
+                        1,
+                        Element.Water,
+                        "Fase 2 · O Fragmento do Mar",
+                        "Guardião do Mar",
+                        "Protetor do Fragmento de Água",
+                        "Fragmento do Mar",
+                        "Onde o fragmento safira caiu nasceu o Mar e despertaram o Guerreiro-Tubarão, Poseidon e a Baleia. Supere o teste das marés para conquistar o 2º Fragmento!",
+                        WaterElementals,
+                        new[]
+                        {
+                            new CutsceneSlide(
+                                ArenaId.Volcano,
+                                CutsceneVisualKind.SpectrumUnlock,
+                                "A RESSONÂNCIA DO FRAGMENTO DO VULCÃO",
+                                "Com a vitória no Vulcão, o primeiro Fragmento do Cristal Elemental brilha em suas mãos e fortalece o seu Espectro para a jornada rumo ao oceano.",
+                                new StoryLine(SummonerName, "1 de 3 Fragmentos Reunidos", Art.SummonerId, Element.Fire, CharClass.Mage,
+                                    "As lendas do Vulcão reconheceram nosso propósito! Enquanto os feridos que ficarem na reserva descansam (+50% HP), rumamos para a zona do Mar!"),
+                                FireElementals
+                            ),
+                            new CutsceneSlide(
+                                ArenaId.Sea,
+                                CutsceneVisualKind.GuardianConfrontation,
+                                "FASE 2 · O SANTUÁRIO CRIADO PELO FRAGMENTO AZUL",
+                                "Onde o segundo fragmento mergulhou formou-se o Mar (+10% para Água, -10% para Fogo), despertando o Guerreiro-Tubarão, Poseidon e a Baleia.",
+                                new StoryLine("Guardião do Mar", "Protetor do Fragmento de Água", "water_mage", Element.Water, CharClass.Mage,
+                                    "Superaste o calor do Vulcão, jovem mago, mas o Mar exige serenidade e leitura precisa de cada turno. Mostre que é digno do segundo Fragmento!")
+                            )
+                        },
+                        0.22,
+                        new AIProfile("campaign_water", "Guardião do Mar", 0.28, 0.80, 2, 0.48, 0.30, 0.02),
+                        new Dictionary<string, int> { { BuiltInContent.MedKit, 1 }, { BuiltInContent.Medicine, 1 }, { BuiltInContent.DefensePotion, 1 } },
+                        new[]
+                        {
+                            new StoryLine("Guardião do Mar", "Protetor do Fragmento de Água", "water_mage", Element.Water, CharClass.Mage,
+                                "O Guerreiro-Tubarão, Poseidon e a Baleia protegem o Fragmento do Mar. Vejamos se sua estratégia flui como a maré!"),
+                            new StoryLine(SummonerName, SummonerTitle, Art.SummonerId, affinity, CharClass.Mage,
+                                "Respeito a força das águas, Guardião. Meu Espectro provará que merece reunir o Cristal Elemental!")
+                        },
+                        "Guardião do Mar: 'Sintam a pressão do oceano! Que a maré ponha à prova a sua guarda!'",
+                        "Guardião do Mar: 'Mesmo na vazante, a última onda do Mar exige respeito total!'",
+                        new[]
+                        {
+                            new StoryLine("Guardião do Mar", "Fragmento do Mar Entregue!", "water_mage", Element.Water, CharClass.Mage,
+                                affinity == Element.Water
+                                    ? "Tua correnteza é firme e serena! Como as lendas da Água já pertencem ao teu Espectro desde o início, confio a ti o Fragmento do Mar!"
+                                    : "Magnífico equilíbrio tático! Receba o Fragmento do Mar — o Guerreiro-Tubarão, Poseidon e a Baleia agora passam a fazer parte do seu Espectro!")
+                        },
+                        new[]
+                        {
+                            new StoryLine("Guardião do Mar", "Conselho das Marés", "water_tank", Element.Water, CharClass.Tank,
+                                "A correnteza superou sua defesa desta vez. Recupere seu Espectro no Santuário e reorganize suas trocas!")
+                        }
+                    );
+
+                case 2:
+                    return new StageNarrative(
+                        2,
+                        Element.Plant,
+                        "Fase 3 · O Fragmento da Floresta",
+                        "Guardião da Floresta",
+                        "Protetor do Fragmento de Planta",
+                        "Fragmento da Floresta",
+                        "Onde o fragmento esmeralda caiu brotou a Floresta Viva e despertaram o Curupira, o Cogumelo e a Árvore. Vença o Guardião para reunir os 3 Fragmentos!",
+                        PlantElementals,
+                        new[]
+                        {
+                            new CutsceneSlide(
+                                ArenaId.Sea,
+                                CutsceneVisualKind.SpectrumUnlock,
+                                "A UNIÃO DO FOGO E DA ÁGUA NO ESPECTRO",
+                                "O Fragmento do Mar se alinha ao Fragmento do Vulcão. O poder combinado das zonas amplia o seu Espectro e aponta para o coração da mata ancestral.",
+                                new StoryLine(SummonerName, "2 de 3 Fragmentos Reunidos", Art.SummonerId, Element.Water, CharClass.Mage,
+                                    "Dois fragmentos do Cristal Elemental já pulsam em harmonia! Resta apenas o Fragmento da Floresta para abrirmos o caminho até a Lua!"),
+                                WaterElementals
+                            ),
+                            new CutsceneSlide(
+                                ArenaId.Forest,
+                                CutsceneVisualKind.GuardianConfrontation,
+                                "FASE 3 · A ZONA GERADA PELO FRAGMENTO ESMERALDA",
+                                "Onde o terceiro fragmento caiu germinou a Floresta (+10% para Planta, -10% para Água), despertando o Curupira, o Cogumelo e a Árvore.",
+                                new StoryLine("Guardião da Floresta", "Protetor do Fragmento de Planta", "plant_warrior", Element.Plant, CharClass.Warrior,
+                                    "A mata sente os fragmentos do Vulcão e do Mar com você, mago. Mas antes de subir até o Núcleo na Lua, prove sua sabedoria diante das lendas da Floresta!")
+                            )
+                        },
+                        0.35,
+                        new AIProfile("campaign_plant", "Guardião da Floresta", 0.32, 0.90, 2, 0.62, 0.35, 0.00),
+                        new Dictionary<string, int> { { BuiltInContent.MedKit, 2 }, { BuiltInContent.Medicine, 1 } },
+                        new[]
+                        {
+                            new StoryLine("Guardião da Floresta", "Protetor do Fragmento de Planta", "plant_warrior", Element.Plant, CharClass.Warrior,
+                                "O Curupira, o Cogumelo e a Árvore guardam o último fragmento terreno. Mostre que você domina o ciclo completo de elemento e classe!"),
+                            new StoryLine(SummonerName, SummonerTitle, Art.SummonerId, affinity, CharClass.Mage,
+                                "Cada Guardião me ensinou a respeitar o equilíbrio da natureza. Superarei o teste da Floresta para levar os três Fragmentos até a Lua!")
+                        },
+                        "Guardião da Floresta: 'Raízes e esporos da mata ancestral, testem a firmeza deste mago!'",
+                        "Guardião da Floresta: 'Enquanto uma semente permanecer de pé, a Floresta manterá seu teste!'",
+                        new[]
+                        {
+                            new StoryLine("Guardião da Floresta", "Os Três Fragmentos Reunidos!", "plant_warrior", Element.Plant, CharClass.Warrior,
+                                affinity == Element.Plant
+                                    ? "Você honrou as raízes que escolheu no começo da jornada! Tome o Fragmento da Floresta — os três Fragmentos agora te levarão até o Núcleo na Lua!"
+                                    : "Você é digno, jovem mago! Receba o Fragmento da Floresta: o Curupira, o Cogumelo e a Árvore completam as 9 lendas do seu Espectro! Rumo à Lua!")
+                        },
+                        new[]
+                        {
+                            new StoryLine("Guardião da Floresta", "Conselho da Mata", "plant_mage", Element.Plant, CharClass.Mage,
+                                "Até a maior árvore precisa de tempo para se regenerar. Cure seu Espectro no Santuário ou evolua seus atributos na Loja antes de retornar.")
+                        }
+                    );
+
+                default:
+                    return new StageNarrative(
+                        3,
+                        Element.Neutral,
+                        "Fase Final · O Guardião do Núcleo",
+                        "Guardião do Núcleo",
+                        "Sentinela Nascido do Núcleo do Cristal",
+                        "Núcleo do Cristal Elemental",
+                        "Com os 3 Fragmentos reunidos e as 9 lendas no seu Espectro, eles levam você até a Lua pesada pelo Núcleo para o teste final do Guardião do Núcleo!",
+                        PlantElementals,
+                        new[]
+                        {
+                            new CutsceneSlide(
+                                ArenaId.Forest,
+                                CutsceneVisualKind.SpectrumUnlock,
+                                "OS TRÊS FRAGMENTOS E O ESPECTRO COMPLETO",
+                                "Com os Fragmentos do Vulcão, do Mar e da Floresta reunidos e todas as 9 lendas integradas ao seu Espectro, os fragmentos abrem um feixe de luz rumo à Lua!",
+                                new StoryLine(SummonerName, "Espectro Completo (9/9 Lendas)", Art.SummonerId, Element.Plant, CharClass.Mage,
+                                    "Os três fragmentos nos guiaram até a Lua! Aqui o peso do Núcleo do Cristal torna a zona pesada, favorecendo os lutadores lentos (<50 Vel) e freando os rápidos."),
+                                PlantElementals
+                            ),
+                            new CutsceneSlide(
+                                ArenaId.Moon,
+                                CutsceneVisualKind.GuardianConfrontation,
+                                "FASE FINAL · O TESTE SUPREMO DO NÚCLEO",
+                                "Na cratera lunar repousa o Núcleo do Cristal Elemental. Dele nasceu o Guardião do Núcleo, uma criatura de elemento neutro que testa se você é digno de restaurar o Cristal.",
+                                new StoryLine("Guardião do Núcleo", "Sentinela Nascido do Núcleo", BuiltInContent.BossId, Element.Neutral, CharClass.Neutral,
+                                    "Mago que uniu o Fogo, a Água e a Planta... Eu nasci do próprio Núcleo do Cristal para este julgamento. Vence-me, e o Cristal Elemental voltará a ser um só!")
+                            )
+                        },
+                        0.18,
+                        new AIProfile("campaign_boss", "Guardião do Núcleo", 0.00, 0.00, 2, 0.38, 0.30, 0.00),
+                        new Dictionary<string, int> { { BuiltInContent.Medicine, 2 }, { BuiltInContent.AttackPotion, 1 } },
+                        new[]
+                        {
+                            new StoryLine("Guardião do Núcleo", "Nascido do Núcleo do Cristal", BuiltInContent.BossId, Element.Neutral, CharClass.Neutral,
+                                "Sou de elemento neutro e carrego o peso gravitacional do Núcleo na Lua. Mostre se o seu Espectro é digno de reunificar o Cristal Elemental!"),
+                            new StoryLine(SummonerName, SummonerTitle, Art.SummonerId, affinity, CharClass.Mage,
+                                "Os Guardiões do Vulcão, do Mar e da Floresta confiaram seus fragmentos e suas lendas a mim. Pelo equilíbrio das zonas, superaremos o seu teste!")
+                        },
+                        "Guardião do Núcleo: 'SINTAM O PESO GRAVITACIONAL DO NÚCLEO DO CRISTAL!'",
+                        "",
+                        new[]
+                        {
+                            new StoryLine("Guardião do Núcleo", "Reconhecimento do Núcleo", BuiltInContent.BossId, Element.Neutral, CharClass.Neutral,
+                                "Extraordinário... Sua sabedoria uniu as nove lendas e superou até a Ressonância Absoluta do Núcleo. Você provou ser digno, mago!"),
+                            new StoryLine(SummonerName, "Novo Guardião do Núcleo!", Art.SummonerId, Element.Neutral, CharClass.Mage,
+                                "Os três Fragmentos se fundem de volta ao Núcleo! O Cristal Elemental está restaurado e o equilíbrio retornou a todas as zonas!")
+                        },
+                        new[]
+                        {
+                            new StoryLine("Guardião do Núcleo", "Julgamento Lunar", BuiltInContent.BossId, Element.Neutral, CharClass.Neutral,
+                                "O peso do Núcleo superou sua formação. Lembre-se de que a Lua favorece lutadores de baixa velocidade (< 50). Prepare seu Espectro e retorne!")
+                        }
+                    );
+            }
         }
 
         public static CutsceneSlide[] GetEpilogueCutscene()
         {
-            return EpilogueCutscene;
+            return new[]
+            {
+                new CutsceneSlide(
+                    ArenaId.Moon,
+                    CutsceneVisualKind.CrystalWhole,
+                    "EPÍLOGO · A REUNIFICAÇÃO DO CRISTAL ELEMENTAL",
+                    "Na superfície da Lua, os Fragmentos do Vulcão, do Mar e da Floresta se fundem novamente ao Núcleo. O Cristal Elemental volta a brilhar inteiro, devolvendo o equilíbrio ao mundo!",
+                    new StoryLine(SummonerName, "Restaurador do Cristal Elemental", Art.SummonerId, Element.Neutral, CharClass.Mage,
+                        "A fúria entre Fogo, Água e Planta cessou! As zonas elementais estão em harmonia, e as nove lendas permanecem unidas ao meu Espectro."),
+                    FireElementals
+                ),
+                new CutsceneSlide(
+                    ArenaId.Forest,
+                    CutsceneVisualKind.CrystalWhole,
+                    "O NOVO GUARDIÃO DO NÚCLEO (CADERNO P. 2)",
+                    "Reconhecido pelos Guardiões do Vulcão, do Mar, da Floresta e pelo próprio Núcleo Lunar, o antigo mago novato assume seu posto lendário como o Novo Guardião do Núcleo!",
+                    new StoryLine(SummonerName, "Novo Guardião do Núcleo", Art.SummonerId, Element.Neutral, CharClass.Mage,
+                        "Agora sou o novo Guardião do Núcleo e protetor do Cristal Elemental. Sempre que as arenas chamarem por um duelo tático, meu Espectro completo responderá!"),
+                    PlantElementals
+                )
+            };
         }
 
         public static string CurrentActSummary(int campaignStage)
         {
-            if (campaignStage >= Chapters.Length)
-                return "Epílogo · Grande Campeão do Eclipse: você despertou os 9 Elementares e derrotou Hyperion! Jogue qualquer capítulo ou inicie uma nova jornada.";
+            if (campaignStage >= 4)
+                return "Epílogo · Novo Guardião do Núcleo: você reunificou o Cristal Elemental e liberou as 9 lendas no Espectro! Jogue qualquer fase ou desafie outros modos.";
             var c = Chapter(campaignStage);
             return c.ActTitle + " — " + c.MapSynopsis;
         }
 
-        // ── Desbloqueio Progressivo dos Elementares na História ──────────────────
+        // ── Desbloqueio Progressivo do Espectro conforme Afinidade e Fases (GDD R11) ──
 
-        /// <summary>Retorna todos os IDs de personagens já conquistados pelo Mago Invocador no progresso atual da Campanha.</summary>
+        /// <summary>
+        /// Retorna as lendas liberadas no Espectro do Mago:
+        /// - Começa com os 3 lutadores da Afinidade escolhida (Fogo, Água ou Planta);
+        /// - Vencer a Fase 1 (Vulcão) garante os 3 de Fogo (e se a afinidade inicial já era Fogo, desperta também a Água para manter a progressão de 3 -> 6 -> 9);
+        /// - Vencer a Fase 2 (Mar) garante os 3 de Água e de Fogo;
+        /// - Vencer a Fase 3 (Floresta) libera todos os 9 lutadores no Espectro!
+        /// </summary>
         public static HashSet<string> GetUnlockedElementals(int campaignStage)
         {
             var unlocked = new HashSet<string>();
-            for (int i = 0; i < Tier0Elementals.Length; i++) unlocked.Add(Tier0Elementals[i]);
+            Element affinity = GetPlayerAffinity();
+            foreach (var id in GetElementalsFor(affinity))
+                unlocked.Add(id);
+
             if (campaignStage >= 1)
-                for (int i = 0; i < Tier1Elementals.Length; i++) unlocked.Add(Tier1Elementals[i]);
+            {
+                foreach (var id in FireElementals) unlocked.Add(id);
+                if (affinity == Element.Fire)
+                    foreach (var id in WaterElementals) unlocked.Add(id);
+            }
             if (campaignStage >= 2)
-                for (int i = 0; i < Tier2Elementals.Length; i++) unlocked.Add(Tier2Elementals[i]);
+            {
+                foreach (var id in FireElementals) unlocked.Add(id);
+                foreach (var id in WaterElementals) unlocked.Add(id);
+                foreach (var id in PlantElementals) unlocked.Add(id);
+            }
             return unlocked;
         }
 
-        /// <summary>Em qual capítulo (1, 2 ou 3) o Elementar é despertado.</summary>
+        /// <summary>Indica em qual etapa da jornada a lenda entra no Espectro do Mago.</summary>
         public static int GetUnlockChapterNumber(string charId)
         {
-            for (int i = 0; i < Tier0Elementals.Length; i++) if (Tier0Elementals[i] == charId) return 1;
-            for (int i = 0; i < Tier1Elementals.Length; i++) if (Tier1Elementals[i] == charId) return 2;
+            var unlocked0 = GetUnlockedElementals(0);
+            if (unlocked0.Contains(charId)) return 1;
+            var unlocked1 = GetUnlockedElementals(1);
+            if (unlocked1.Contains(charId)) return 2;
             return 3;
         }
 
-        // ── Dano Persistente entre as Fases & Recuperação no Grimório ────────────
+        // ── Dano Persistente entre as Fases & Recuperação no Espectro ────────────
 
         private static Dictionary<string, int> LoadHpTable()
         {
@@ -434,7 +532,6 @@ namespace ComboTactics.UI
             PlayerPrefs.Save();
         }
 
-        /// <summary>Retorna o HP atual persistido do guerreiro no Modo História (ou MaxHp se ainda intacto).</summary>
         public static int GetPersistentHp(string charId, int maxHp)
         {
             var map = LoadHpTable();
@@ -443,7 +540,6 @@ namespace ComboTactics.UI
             return Mathf.Clamp(saved, 0, maxHp);
         }
 
-        /// <summary>Aplica o HP persistente salvo no Grimório aos 3 lutadores da equipe do jogador no início da luta.</summary>
         public static void ApplyPersistentHpToBattle(BattleEngine engine, BattleSnapshot view)
         {
             if (engine == null || view == null) return;
@@ -457,12 +553,6 @@ namespace ComboTactics.UI
             }
         }
 
-        /// <summary>
-        /// Ao vencer uma fase da Campanha:
-        /// 1. Persiste o HP restante dos 3 Elementares que lutaram (0 se caíram em combate);
-        /// 2. Regenera +50% do HP máximo para todos os Elementares já despertados que descansaram fora da luta;
-        /// 3. Garante que pelo menos 3 Elementares tenham vida para a próxima fase (evita softlock).
-        /// </summary>
         public static void RecordStageVictoryState(
             int stageIndex,
             Fighter[] battleTeam,
@@ -501,7 +591,6 @@ namespace ComboTactics.UI
                 }
             }
 
-            // Garante que novos Elementares despertados pelo Selo recém-conquistado entrem com 100% de HP
             var unlockedNow = GetUnlockedElementals(unlockedStageAfterWin);
             foreach (var id in unlockedNow)
             {
@@ -509,13 +598,12 @@ namespace ComboTactics.UI
                     hpMap.Remove(id);
             }
 
-            // Proteção contra softlock: garante pelo menos 3 Elementares vivos para a próxima invocação
             EnsureMinimumAliveRoster(hpMap, unlockedNow, content, economy, upgradeLevel);
             SaveHpTable(hpMap);
 
             string report = restedNames.Count > 0
-                ? "Descanso no Grimório (+50% HP): " + string.Join(", ", restedNames.ToArray())
-                : "O HP restante dos seus Elementares foi salvo no Grimório.";
+                ? "Recuperação no Espectro (+50% HP): " + string.Join(", ", restedNames.ToArray())
+                : "O HP restante dos lutadores do seu Espectro foi salvo.";
             PlayerPrefs.SetString(RestReportPrefsKey, report);
             PlayerPrefs.Save();
         }
@@ -556,7 +644,6 @@ namespace ComboTactics.UI
             return PlayerPrefs.GetString(RestReportPrefsKey, "");
         }
 
-        /// <summary>Cura 100% do HP de um único Elementar no Santuário.</summary>
         public static void HealElementalFull(string charId)
         {
             var map = LoadHpTable();
@@ -567,14 +654,12 @@ namespace ComboTactics.UI
             }
         }
 
-        /// <summary>Restaura 100% do HP de todos os Elementares do Grimório.</summary>
         public static void HealAllElementals()
         {
             PlayerPrefs.DeleteKey(HpPrefsKey);
             PlayerPrefs.Save();
         }
 
-        /// <summary>Verifica se há algum Elementar despertado que está com dano no Grimório.</summary>
         public static bool HasAnyDamagedElemental(int campaignStage, ContentDatabase content, EconomyConfig economy, Func<string, Stat, int> upgradeLevel)
         {
             var unlocked = GetUnlockedElementals(campaignStage);
@@ -605,8 +690,7 @@ namespace ComboTactics.UI
 
         public static void ClearFatigue()
         {
-            PlayerPrefs.DeleteKey(FatiguePrefsKey);
-            PlayerPrefs.DeleteKey(FatigueStagePrefsKey);
+            PlayerPrefs.DeleteKey(AffinityPrefsKey);
             PlayerPrefs.DeleteKey(HpPrefsKey);
             PlayerPrefs.DeleteKey(CutsceneMaskPrefsKey);
             PlayerPrefs.DeleteKey(RestReportPrefsKey);
@@ -615,7 +699,6 @@ namespace ComboTactics.UI
 
         // ── Escalonamento de Desafio da Campanha ─────────────────────────────────
 
-        /// <summary>Aplica os status escalonados (+12% / +22% / +35% / Boss aprimorado) e IA tática nas lutas do Modo História.</summary>
         public static void EnhanceCampaignMatch(Match match, ContentDatabase content, BattleRules rules)
         {
             if (match == null || match.Mode != GameMode.Campaign) return;
@@ -629,7 +712,7 @@ namespace ComboTactics.UI
             }
 
             match.OpponentAi = chapter.ChallengingAi;
-            match.SideNames = new[] { "Kaelen (Invocador)", chapter.MasterName };
+            match.SideNames = new[] { "O Mago (Seu Espectro)", chapter.MasterName };
             match.Setup = new BattleSetup(
                 match.Setup.Teams[0],
                 enhancedEnemies,

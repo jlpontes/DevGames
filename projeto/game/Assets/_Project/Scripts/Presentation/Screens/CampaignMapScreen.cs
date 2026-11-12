@@ -5,9 +5,9 @@ using UnityEngine;
 namespace ComboTactics.UI
 {
     /// <summary>
-    /// Hub da Jornada Contínua do Modo História ("O Grimório do Eclipse"):
-    /// Apresenta o protagonista (Kaelen, o Mago Invocador), a linha do tempo dos 4 Selos,
-    /// o estado de vida persistente dos 9 Elementares no Grimório e 1 botão principal "Jogar / Continuar História".
+    /// Hub da Jornada Contínua do Modo História ("A Queda do Cristal Elemental" — GDD §2, Caderno p. 2, 3, 5, 8; R9–R11):
+    /// Apresenta o protagonista (O Mago), sua Afinidade Elemental, a busca pelos 3 Fragmentos e pelo Núcleo Lunar,
+    /// o estado de vida persistente das 9 Lendas no Espectro e 1 botão principal "Jogar / Continuar História".
     /// </summary>
     public sealed class CampaignMapScreen : UiScreen
     {
@@ -19,27 +19,48 @@ namespace ComboTactics.UI
             int currentActIdx = Mathf.Clamp(progress, 0, services.Campaign.Stages.Count - 1);
             var currentChapter = CampaignStory.Chapter(currentActIdx);
             var unlockedSet = CampaignStory.GetUnlockedElementals(progress);
+            Element affinity = CampaignStory.GetPlayerAffinity();
+            Color affinityCol = Theme.ElementColor(affinity);
 
             Ui.Backdrop(Root, Art.Arena(services.Campaign.Stages[currentActIdx].HomeArena), 0.26f);
 
-            // 1. Cabeçalho do Protagonista (Kaelen, o Mago Invocador) e Save Automático
+            // 1. Cabeçalho do Protagonista (O Mago), Cristal Elemental e Afinidade
             var heroBar = Ui.Frame(Root, "HeroHeader", 36, 12, 968, 70, Theme.Panel, Theme.BorderGold, 2f);
             Ui.Picture(heroBar, "SummonerPortrait", Art.Fighter(Art.SummonerId, Element.Neutral, CharClass.Mage), 10, 5, 56, 56);
-            Ui.Label(heroBar, CampaignStory.SummonerName.ToUpper() + "  ·  MODO HISTÓRIA CONTÍNUO",
-                78, 6, 620, 28, 22, Theme.Gold, TextAnchor.MiddleLeft, FontStyle.Bold, true);
-            Ui.Label(heroBar, CampaignStory.CurrentActSummary(progress),
-                78, 34, 876, 26, 13, Theme.Text, TextAnchor.MiddleLeft);
 
-            var saveBadge = Ui.Frame(heroBar, "SaveBadge", 734, 8, 220, 24, Theme.PanelLight, Theme.Good, 1f);
-            Ui.Label(saveBadge, "✓ JORNADA SALVA (" + unlockedSet.Count + "/9 ELEMENTARES)",
-                4, 0, 212, 22, 11, Theme.Good, TextAnchor.MiddleCenter, FontStyle.Bold);
+            Texture crystalTex = services.Campaign.IsCompleted ? Art.CrystalWhole : Art.CrystalShattered;
+            Ui.Picture(heroBar, "CrystalIcon", crystalTex, 70, 7, 52, 52);
+
+            string titleStatus = services.Campaign.IsCompleted
+                ? "O MAGO  ·  NOVO GUARDIÃO DO NÚCLEO"
+                : "O MAGO  ·  JORNADA DO CRISTAL ELEMENTAL";
+            Ui.Label(heroBar, titleStatus,
+                128, 6, 480, 26, 20, Theme.Gold, TextAnchor.MiddleLeft, FontStyle.Bold, true);
+            Ui.Label(heroBar, CampaignStory.CurrentActSummary(progress),
+                128, 34, 826, 26, 12, Theme.Text, TextAnchor.MiddleLeft);
+
+            var affinityBadge = Ui.Frame(heroBar, "AffinityBadge", 590, 7, 156, 24, Theme.PanelLight, affinityCol, 1f);
+            Ui.Label(affinityBadge, "Afinidade: " + Theme.ElementName(affinity),
+                4, 0, 148, 22, 11, affinityCol, TextAnchor.MiddleCenter, FontStyle.Bold);
+
+            var saveBadge = Ui.Frame(heroBar, "SaveBadge", 754, 7, 202, 24, Theme.PanelLight, Theme.Good, 1f);
+            Ui.Label(saveBadge, "✓ ESPECTRO SALVO (" + unlockedSet.Count + "/9 LENDAS)",
+                4, 0, 194, 22, 11, Theme.Good, TextAnchor.MiddleCenter, FontStyle.Bold);
 
             var coins = Ui.Frame(Root, "Coins", 1018, 12, 226, 70, Theme.Panel, Theme.BorderGold, 2f);
-            Ui.Label(coins, "MOEDAS DO CLÃ", 0, 8, 222, 20, 12, Theme.Muted, TextAnchor.MiddleCenter, FontStyle.Bold);
+            Ui.Label(coins, "MOEDAS DE CRISTAL", 0, 8, 222, 20, 12, Theme.Muted, TextAnchor.MiddleCenter, FontStyle.Bold);
             Ui.Label(coins, services.Profile.Coins.ToString(), 0, 28, 222, 34, 26, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold, true);
 
-            // 2. Linha do Tempo dos 4 Atos da História
+            // 2. Linha do Tempo das 4 Fases (3 Zonas Elementais + Núcleo na Lua)
             var stages = services.Campaign.Stages;
+            string[] relicLabels =
+            {
+                "🔥 Fragmento do Vulcão",
+                "💧 Fragmento do Mar",
+                "🌿 Fragmento da Floresta",
+                "☾ Núcleo do Cristal"
+            };
+
             for (int i = 0; i < stages.Count; i++)
             {
                 var opponent = stages[i];
@@ -68,19 +89,22 @@ namespace ComboTactics.UI
                     if (!unlocked) icon.color = new Color(0.18f, 0.18f, 0.22f, 0.9f);
                 }
 
-                string badgeText = isCurrent ? "★ CAPÍTULO ATUAL" : cleared ? "✓ CONCLUÍDO" : "ATO " + (i + 1);
-                var badge = Ui.Box(card, "StageBadge", 10, 10, 142, 24, new Color(0.05f, 0.04f, 0.07f, 0.90f));
-                Ui.Label(badge.transform, badgeText, 0, 0, 142, 24, 11, isCurrent ? Theme.Gold : cleared ? Theme.Good : accent, TextAnchor.MiddleCenter, FontStyle.Bold);
+                string badgeText = isCurrent ? "★ PROVAÇÃO ATUAL" : cleared ? "✓ FRAGMENTO OBTIDO" : "ZONA " + (i + 1);
+                var badge = Ui.Box(card, "StageBadge", 10, 10, 152, 24, new Color(0.05f, 0.04f, 0.07f, 0.90f));
+                Ui.Label(badge.transform, badgeText, 0, 0, 152, 24, 11, isCurrent ? Theme.Gold : cleared ? Theme.Good : accent, TextAnchor.MiddleCenter, FontStyle.Bold);
 
-                Ui.Label(card, chapter.ActTitle, 10, 138, 268, 24, 17, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold, true);
+                Ui.Label(card, chapter.ActTitle, 10, 138, 268, 24, 16, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold, true);
                 Ui.Label(card, chapter.MasterName, 10, 162, 268, 22, 15, Theme.Text, TextAnchor.MiddleCenter, FontStyle.Bold);
                 Ui.Label(card, chapter.MapSynopsis, 12, 186, 264, 62, 12, Theme.Muted, TextAnchor.UpperCenter);
 
-                // Mostra os Elementares que despertam neste Ato
+                // Relíquia e Lendas que se unem ao Espectro neste Ato
                 var pactBox = Ui.Frame(card, "PactBox", 10, 252, 268, 56, Theme.Panel, Theme.BorderSubtle, 1f);
                 if (chapter.NewlySummonedIds.Length > 0)
                 {
-                    Ui.Label(pactBox, "Pacto do Grimório neste Ato (+3 Elementares):", 6, 2, 254, 18, 11, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold);
+                    string headerLabel = i == 0
+                        ? "Espectro Inicial (" + Theme.ElementName(affinity) + " · 3 Lendas):"
+                        : relicLabels[i - 1] + " (+3 Lendas no Espectro):";
+                    Ui.Label(pactBox, headerLabel, 6, 2, 254, 18, 11, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold);
                     for (int e = 0; e < chapter.NewlySummonedIds.Length; e++)
                     {
                         var eDef = content.Character(chapter.NewlySummonedIds[e]);
@@ -89,7 +113,7 @@ namespace ComboTactics.UI
                 }
                 else
                 {
-                    Ui.Label(pactBox, "Grimório Completo (9/9 Elementares)\nBoss de 2 Fases (Despertar <50% HP)",
+                    Ui.Label(pactBox, "Espectro Completo (9/9 Lendas)\nGuardião do Núcleo (2 Fases · Lua)",
                         6, 6, 254, 42, 11, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold);
                 }
 
@@ -97,19 +121,19 @@ namespace ComboTactics.UI
                     10, 314, 268, 20, 12, accent, TextAnchor.MiddleCenter, FontStyle.Bold);
 
                 int stageIndex = i;
-                string stageBtnText = isCurrent ? "▶ Continuar Aqui" : cleared ? "🎬 Rever / Jogar Ato" : "🔒 Bloqueado";
+                string stageBtnText = isCurrent ? "▶ Enfrentar Guardião" : cleared ? "🎬 Rever / Jogar Fase" : "🔒 Zona Bloqueada";
                 var stageBtn = Ui.Button(card, stageBtnText, 24, 338, 240, 40,
                     () => App.PlayCampaignStage(stageIndex, cleared),
                     isCurrent ? Theme.ButtonPrimary : Theme.Button, 15);
                 stageBtn.interactable = unlocked;
             }
 
-            // 3. Faixa do Grimório Elemental (Mostra os 9 Elementares e o HP Persistente atual de cada um!)
+            // 3. Faixa do Espectro Elemental (Mostra as 9 Lendas e o HP Persistente atual de cada uma!)
             var grimoireBar = Ui.Frame(Root, "GrimoireBar", 36, 494, 1208, 112, Theme.Panel, Theme.BorderGold, 2f);
             string restInfo = CampaignStory.GetLastRestReport();
             Ui.Label(grimoireBar,
-                "GRIMÓRIO ASTRAL — VIDA PERSISTENTE ENTRE AS FASES   " +
-                (string.IsNullOrEmpty(restInfo) ? "(Quem fica no banco recupera +50% HP ao vencer uma fase)" : "·  " + restInfo),
+                "ESPECTRO DO MAGO — VIDA PERSISTENTE ENTRE AS FASES   " +
+                (string.IsNullOrEmpty(restInfo) ? "(Quem descansa no Espectro recupera +50% HP ao vencer uma fase)" : "·  " + restInfo),
                 14, 4, 1180, 22, 13, Theme.Gold, TextAnchor.MiddleLeft, FontStyle.Bold);
 
             var allChars = content.PlayableCharacters;
@@ -129,9 +153,9 @@ namespace ComboTactics.UI
                 if (!isUnlocked) pic.color = new Color(0.15f, 0.15f, 0.20f, 0.8f);
 
                 string shortName = def.Name.Replace("Guerreiro de ", "G. ").Replace("Mago de ", "M. ").Replace("Tanque de ", "T. ");
-                Ui.Label(mini, isUnlocked ? shortName : "🔒 Ato " + CampaignStory.GetUnlockChapterNumber(def.Id),
+                Ui.Label(mini, isUnlocked ? shortName : "🔒 Fase " + CampaignStory.GetUnlockChapterNumber(def.Id),
                     50, 6, 72, 20, 12, isUnlocked ? Theme.Text : Theme.Muted, TextAnchor.MiddleLeft, FontStyle.Bold);
-                Ui.Label(mini, isUnlocked ? (hp + "/" + spec.MaxHp) : "Selado",
+                Ui.Label(mini, isUnlocked ? (hp + "/" + spec.MaxHp) : "Zona Selada",
                     50, 26, 72, 18, 11, !isUnlocked ? Theme.Muted : hp <= 0 ? Theme.Bad : Theme.Gold, TextAnchor.MiddleLeft, FontStyle.Bold);
 
                 if (isUnlocked)
@@ -146,17 +170,17 @@ namespace ComboTactics.UI
 
             bool anyDamaged = CampaignStory.HasAnyDamagedElemental(progress, content, services.Economy,
                 (id, st) => services.Profile.UpgradeLevel(id, st));
-            var healBtn = Ui.Button(Root, "✦ Altar: Curar Todos (" + CampaignStory.HealAllCost + "m)",
+            var healBtn = Ui.Button(Root, "✦ Cristal: Curar Todos (" + CampaignStory.HealAllCost + "m)",
                 234, 620, 264, 68, () =>
                 {
                     if (!services.Profile.TrySpend(CampaignStory.HealAllCost))
                     {
-                        App.Notify("Você precisa de " + CampaignStory.HealAllCost + " moedas para restaurar o Grimório no Altar.");
+                        App.Notify("Você precisa de " + CampaignStory.HealAllCost + " moedas para restaurar o Espectro no Santuário do Cristal.");
                         return;
                     }
                     services.Profile.Save();
                     CampaignStory.HealAllElementals();
-                    App.Notify("Altar Astral: todos os Elementares voltaram a 100% de HP!");
+                    App.Notify("Santuário do Cristal: todas as lendas do seu Espectro voltaram a 100% de HP!");
                     Rebuild();
                 }, anyDamaged ? new Color(0.16f, 0.36f, 0.24f, 0.96f) : Theme.Button, 16);
             healBtn.interactable = anyDamaged;
@@ -164,14 +188,14 @@ namespace ComboTactics.UI
             Ui.Button(Root, "Loja & Evolução", 512, 620, 204, 68, App.ShowStore, Theme.Button, 18);
 
             string playLabel = services.Campaign.IsCompleted
-                ? "▶ JOGAR CAPÍTULO FINAL (HYPERION)"
+                ? "▶ JOGAR PROVAÇÃO FINAL (NÚCLEO)"
                 : progress == 0 && !CampaignStory.HasSeenCutscene(0)
-                    ? "▶ INICIAR HISTÓRIA (ATO I)"
+                    ? "▶ INICIAR HISTÓRIA (FASE 1)"
                     : "▶ CONTINUAR HISTÓRIA (" + currentChapter.ActTitle.Split('·')[0].Trim().ToUpper() + ")";
 
             var playBtn = Ui.Button(Root, "", 732, 616, 512, 76, App.ContinueCampaignStory, Theme.ButtonPrimary, 24);
-            Ui.Label(playBtn.transform, playLabel, 12, 8, 488, 36, 24, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold, true);
-            Ui.Label(playBtn.transform, "Fluxo Contínuo com Save Automático: Cutscene ➔ Grimório ➔ Batalha",
+            Ui.Label(playBtn.transform, playLabel, 12, 8, 488, 36, 23, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold, true);
+            Ui.Label(playBtn.transform, "Fluxo Contínuo com Save Automático: Cutscene ➔ Espectro ➔ Batalha",
                 12, 44, 488, 22, 13, new Color(1f, 0.92f, 0.78f, 0.95f), TextAnchor.MiddleCenter, FontStyle.Bold);
         }
     }

@@ -14,6 +14,8 @@ namespace ComboTactics.UI
         private static readonly HashSet<string> MissingSprites = new HashSet<string>();
 
         public static Texture2D Menu { get { return Load("Art/menu", new Color(0.10f, 0.09f, 0.14f)); } }
+        public static Texture2D CrystalWhole { get { return Load("Art/crystal_whole", new Color(0.95f, 0.80f, 0.35f)); } }
+        public static Texture2D CrystalShattered { get { return Load("Art/crystal_shattered", new Color(0.75f, 0.55f, 0.95f)); } }
 
         public static Texture2D Arena(ArenaId arena)
         {

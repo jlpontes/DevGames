@@ -698,7 +698,7 @@ namespace ComboTactics.UI
             Say("O ECLIPSE TOTAL SE COMPLETA! Hyperion desperta sua verdadeira forma cósmica!");
 
             var banner = Ui.Frame(_overlay, "Phase2Banner", 200, 196, 880, 96, new Color(0.08f, 0.04f, 0.14f, 0.95f), eclipseColor, 2.5f);
-            Ui.Label(banner, "★ DESPERTAR DO TITÃ LUNAR — FASE 2 ★", 16, 10, 848, 40, 28, eclipseColor, TextAnchor.MiddleCenter, FontStyle.Bold, true);
+            Ui.Label(banner, "★ RESSONÂNCIA DO NÚCLEO — FASE 2 ★", 16, 10, 848, 40, 28, eclipseColor, TextAnchor.MiddleCenter, FontStyle.Bold, true);
             Ui.Label(banner, "Stamina Máxima Restaurada  ·  Ataque +10%  ·  Defesa +10%", 16, 50, 848, 32, 16, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold);
 
             var pillar = SpawnVfx(Art.VfxPillar, bossWidget.CenterX, bossWidget.CenterY, 200f, 340f, eclipseColor);
@@ -739,8 +739,8 @@ namespace ComboTactics.UI
 
             yield return PlayStorySequence(new[]
             {
-                new StoryLine("Hyperion, o Titã Lunar", "Fase 2 · Despertar do Eclipse", BuiltInContent.BossId, Element.Neutral, CharClass.Neutral,
-                    "Vocês ousaram trincar minha armadura mortal?! Contemplem o poder absoluto da Lua Negra: minha Stamina e meu cosmos estão no limite máximo!")
+                new StoryLine("Guardião do Núcleo", "Fase 2 · Ressonância Absoluta do Núcleo", BuiltInContent.BossId, Element.Neutral, CharClass.Neutral,
+                    "Você provou que domina as lendas das zonas, mago! Agora sinta a Ressonância Absoluta do Núcleo do Cristal: minha Stamina e meu poder estão no limite máximo!")
             });
         }
 
