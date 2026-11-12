@@ -30,3 +30,4 @@ Sempre que o Modo História, diálogos, cutscenes ou progressão de campanha for
 ## 2. Diretrizes de Direção Cinematográfica (Cutscenes)
 - **Visualização do Cristal Elemental**: Mostrar o estado do Cristal (Inteiro ➔ Estilhaçado nas 3 Zonas + Lua ➔ Fragmentos reunidos ➔ Cristal Restaurado no Epílogo).
 - **Ritmo e Transições**: Utilizar fade cinematográfico, efeito de texto progressivo (*typewriter* com clique para completar), partículas elementais da zona ativa, feixes de luz e destaque visual para os Fragmentos conquistados e lutadores do Espectro.
+
