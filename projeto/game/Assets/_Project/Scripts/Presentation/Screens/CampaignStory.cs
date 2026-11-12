@@ -27,18 +27,30 @@ namespace ComboTactics.UI
         }
     }
 
+    /// <summary>Como a cutscene encena o cartão (cristal inteiro, cristal partido, escolha de afinidade, espectro, confronto).</summary>
+    public enum CutsceneVisualKind
+    {
+        GuardianConfrontation,
+        CrystalWhole,
+        CrystalShatter,
+        AffinityChoice,
+        SpectrumUnlock
+    }
+
     /// <summary>Cena de uma Cutscene cinematográfica entre os capítulos da História.</summary>
     public sealed class CutsceneSlide
     {
         public readonly ArenaId BackdropArena;
+        public readonly CutsceneVisualKind VisualKind;
         public readonly string HeaderTitle;
         public readonly string Narration;
         public readonly StoryLine Dialogue;
         public readonly string[] SummonedElementals;
 
-        public CutsceneSlide(ArenaId backdropArena, string headerTitle, string narration, StoryLine dialogue, string[] summonedElementals = null)
+        public CutsceneSlide(ArenaId backdropArena, CutsceneVisualKind visualKind, string headerTitle, string narration, StoryLine dialogue, string[] summonedElementals = null)
         {
             BackdropArena = backdropArena;
+            VisualKind = visualKind;
             HeaderTitle = headerTitle;
             Narration = narration;
             Dialogue = dialogue;
@@ -50,6 +62,8 @@ namespace ComboTactics.UI
     public sealed class StageNarrative
     {
         public int StageIndex;
+        /// <summary>Elemento da zona do guardião (Neutral no Núcleo).</summary>
+        public Element ZoneElement;
         public string ActTitle;
         public string MasterName;
         public string MasterTitle;
@@ -113,6 +127,7 @@ namespace ComboTactics.UI
             return new StageNarrative
             {
                 StageIndex = idx,
+                ZoneElement = opponent.UnlocksElement,
                 ActTitle = script.ActTitle,
                 MasterName = script.GuardianName,
                 MasterTitle = script.GuardianTitle,
@@ -249,7 +264,7 @@ namespace ComboTactics.UI
             for (int i = 0; i < beats.Count; i++)
             {
                 var beat = beats[i];
-                result[i] = new CutsceneSlide(beat.Backdrop, beat.Header, beat.Narration, ToLine(beat.Line), ToArray(beat.ShowFighters));
+                result[i] = new CutsceneSlide(beat.Backdrop, (CutsceneVisualKind)(int)beat.Visual, beat.Header, beat.Narration, ToLine(beat.Line), ToArray(beat.ShowFighters));
             }
             return result;
         }

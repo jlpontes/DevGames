@@ -18,6 +18,9 @@ namespace ComboTactics.Game
         }
     }
 
+    /// <summary>Como o cartão é encenado. Os nomes batem com CutsceneVisualKind da tela de cutscene.</summary>
+    public enum StoryVisual { GuardianConfrontation, CrystalWhole, CrystalShatter, AffinityChoice, SpectrumUnlock }
+
     /// <summary>
     /// Um cartão de história (GDD R12): fundo, título, narração, uma fala opcional e, quando lutadores entram
     /// no espectro (ou celebram no final), os retratos deles em destaque.
@@ -25,14 +28,15 @@ namespace ComboTactics.Game
     public sealed class StoryBeat
     {
         public readonly ArenaId Backdrop;
+        public readonly StoryVisual Visual;
         public readonly string Header;
         public readonly string Narration;
         public readonly StoryLineDef Line;
         public readonly IReadOnlyList<string> ShowFighters;
 
-        public StoryBeat(ArenaId backdrop, string header, string narration, StoryLineDef line, IReadOnlyList<string> showFighters = null)
+        public StoryBeat(ArenaId backdrop, StoryVisual visual, string header, string narration, StoryLineDef line, IReadOnlyList<string> showFighters = null)
         {
-            Backdrop = backdrop; Header = header; Narration = narration; Line = line;
+            Backdrop = backdrop; Visual = visual; Header = header; Narration = narration; Line = line;
             ShowFighters = showFighters ?? new string[0];
         }
     }
@@ -92,16 +96,16 @@ namespace ComboTactics.Game
         {
             return new List<StoryBeat>
             {
-                new StoryBeat(ArenaId.Moon, "PRÓLOGO · O CRISTAL ELEMENTAL",
+                new StoryBeat(ArenaId.Moon, StoryVisual.CrystalWhole, "PRÓLOGO · O CRISTAL ELEMENTAL",
                     "Por eras, o Cristal Elemental manteve Fogo, Água e Planta em equilíbrio. Numa noite sem estrelas, ele se partiu, e seus fragmentos riscaram o céu.",
                     Mage("Eu senti o estalo no peito... como se o mundo tivesse perdido o compasso.", "Mago novato")),
-                new StoryBeat(ArenaId.Volcano, "ONDE OS FRAGMENTOS CAÍRAM",
+                new StoryBeat(ArenaId.Volcano, StoryVisual.CrystalShatter, "ONDE OS FRAGMENTOS CAÍRAM",
                     "Onde cada fragmento caiu nasceu uma zona: o Vulcão, o Mar e a Floresta. A energia deles despertou as criaturas e lendas de cada lugar.",
                     null),
-                new StoryBeat(ArenaId.Moon, "O PESO DO NÚCLEO",
+                new StoryBeat(ArenaId.Moon, StoryVisual.CrystalShatter, "O PESO DO NÚCLEO",
                     "O núcleo do cristal, sem elemento, foi parar na Lua. O peso dele deixou aquela zona pesada: lá, só os lentos pisam firme.",
                     Mage("Se eu reunir os três fragmentos, o caminho até o núcleo se abre. Mas sozinho eu não passo do primeiro guardião.", "Mago novato")),
-                new StoryBeat(ArenaId.Forest, "O GRIMÓRIO E O ESPECTRO",
+                new StoryBeat(ArenaId.Forest, StoryVisual.AffinityChoice, "O GRIMÓRIO E O ESPECTRO",
                     "Todo mago carrega um espectro: os lutadores que respondem ao seu chamado. O de Kaelen ainda está vazio. A primeira afinidade decide quem vai atender.",
                     Mage("Fogo, Água ou Planta... Escolho o elemento que vai caminhar comigo desde o começo.", "Mago novato")),
             };
@@ -114,10 +118,10 @@ namespace ComboTactics.Game
             string names = Names(content, trio);
             return new List<StoryBeat>
             {
-                new StoryBeat(HomeArena(affinity), "O PRIMEIRO CHAMADO · " + ElementTitle(affinity).ToUpperInvariant(),
+                new StoryBeat(HomeArena(affinity), StoryVisual.SpectrumUnlock, "O PRIMEIRO CHAMADO · " + ElementTitle(affinity).ToUpperInvariant(),
                     "Kaelen abre o Grimório e entoa o chamado do " + ElementTitle(affinity) + ". Três lutadores respondem e passam a fazer parte do seu espectro.",
                     Mage(names + "... Lutem comigo, e eu prometo devolver o equilíbrio às suas terras."), trio),
-                new StoryBeat(ArenaId.Volcano, "RUMO AO VULCÃO",
+                new StoryBeat(ArenaId.Volcano, StoryVisual.CrystalShatter, "RUMO AO VULCÃO",
                     "A ordem dos fragmentos não muda para ninguém: primeiro o Vulcão, depois o Mar, depois a Floresta. Lutadores desgarrados pelo caminho também podem se juntar ao espectro, se Kaelen provar o seu valor.",
                     Mage("Ecos do Cristal... Se eu ajudar quem se perdeu da própria zona, talvez eles me ajudem a vencer os guardiões.")),
             };
@@ -180,9 +184,9 @@ namespace ComboTactics.Game
                     : "Vença " + guardian + " para levar o " + fragment + " e trazer os 3 lutadores do " + ElementTitle(element) + " para o seu espectro.",
             };
 
-            chapter.Opening.Add(new StoryBeat(HomeArena(element), actTitle.ToUpperInvariant(), setting,
+            chapter.Opening.Add(new StoryBeat(HomeArena(element), StoryVisual.GuardianConfrontation, actTitle.ToUpperInvariant(), setting,
                 new StoryLineDef(fullName, guardianTitle, portraitId, challenge)));
-            chapter.Opening.Add(new StoryBeat(HomeArena(element), "O DESAFIO DO GUARDIÃO",
+            chapter.Opening.Add(new StoryBeat(HomeArena(element), StoryVisual.GuardianConfrontation, "O DESAFIO DO GUARDIÃO",
                 ownElement
                     ? "Os lutadores de " + guardian + " são do mesmo elemento que o seu espectro. Vencer não traz ninguém novo, mas o fragmento é indispensável."
                     : "Os três lutadores de " + guardian + " juram seguir quem os vencer. Uma vitória aqui aumenta o espectro de Kaelen.",
@@ -227,10 +231,10 @@ namespace ComboTactics.Game
                 PhaseShiftQuote = "Você trincou a casca do núcleo... Agora eu luto com o peso inteiro dele!",
             };
 
-            chapter.Opening.Add(new StoryBeat(ArenaId.Moon, "ATO FINAL · A SUBIDA À LUA",
+            chapter.Opening.Add(new StoryBeat(ArenaId.Moon, StoryVisual.CrystalShatter, "ATO FINAL · A SUBIDA À LUA",
                 "Os três fragmentos se alinham e formam uma ponte de luz até a Lua. Lá, a gravidade do núcleo faz os lentos golpearem como meteoros e os rápidos tropeçarem.",
                 Mage("Brasas, Marés, Raízes... Chegamos. Agora falta só o coração do cristal.")));
-            chapter.Opening.Add(new StoryBeat(ArenaId.Moon, "O GUARDIÃO DO NÚCLEO",
+            chapter.Opening.Add(new StoryBeat(ArenaId.Moon, StoryVisual.GuardianConfrontation, "O GUARDIÃO DO NÚCLEO",
                 "Do núcleo sem elemento nasceu Ástreo. Ele não é um vilão: guarda o cristal desde que ele se partiu, esperando alguém digno de reuni-lo.",
                 new StoryLineDef(name, title, portrait,
                     "Muitos chegaram até aqui com fragmentos nas mãos. Nenhum aguentou o peso do núcleo. Prove que você é diferente, Kaelen.")));
@@ -253,11 +257,11 @@ namespace ComboTactics.Game
         {
             return new List<StoryBeat>
             {
-                new StoryBeat(ArenaId.Moon, "EPÍLOGO · O CRISTAL REUNIDO",
+                new StoryBeat(ArenaId.Moon, StoryVisual.CrystalWhole, "EPÍLOGO · O CRISTAL REUNIDO",
                     "Fragmentos e núcleo se encontram nas mãos de Kaelen. O Cristal Elemental volta a pulsar, e uma luz serena desce da Lua até as três zonas.",
                     Mage("Eu achava que precisava ser forte. Precisava era de vocês.", "Novo Guardião do Núcleo"),
                     new[] { "fire_mage", "water_mage", "plant_mage" }),
-                new StoryBeat(ArenaId.Forest, "O EQUILÍBRIO DAS ZONAS",
+                new StoryBeat(ArenaId.Forest, StoryVisual.CrystalWhole, "O EQUILÍBRIO DAS ZONAS",
                     "O Vulcão volta a dormir, o Mar se acalma e a Floresta respira. Ignis, Nereu e Sylvan saúdam o novo guardião do núcleo.",
                     Mage("As arenas continuam abertas. Sempre que alguém quiser me testar, o espectro inteiro estará pronto.", "Novo Guardião do Núcleo"),
                     new[] { "fire_tank", "water_tank", "plant_tank" }),
@@ -329,7 +333,7 @@ namespace ComboTactics.Game
             }
 
             var script = new MissionScript();
-            script.Briefing.Add(new StoryBeat(mission.Arena, "ECO DO CRISTAL · " + mission.Title.ToUpperInvariant(), pitch,
+            script.Briefing.Add(new StoryBeat(mission.Arena, StoryVisual.GuardianConfrontation, "ECO DO CRISTAL · " + mission.Title.ToUpperInvariant(), pitch,
                 new StoryLineDef(name, "Eco do Cristal", mission.RecruitId, challenge)));
             script.Victory.Add(new StoryLineDef(name, "Entra no espectro", mission.RecruitId, accept));
             script.Defeat.Add(new StoryLineDef(name, "Eco do Cristal", mission.RecruitId, "Ainda não. Volte quando o seu espectro estiver pronto."));

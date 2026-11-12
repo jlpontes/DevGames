@@ -51,11 +51,11 @@ O fluxo de uma batalha: o `BattleDirector` pergunta aos controladores o que o mo
 
 ## Testes
 
-**Window > General > Test Runner > EditMode > Run All.** São 132 testes: fórmula de dano com os exemplos do GDD (135 e 29), regras R1–R14, cada regra da IA, afinidade e espectro, missões, HP da jornada, 2ª fase do guardião, roteiro, loja, save (inclusive a migração da versão 1) e a simulação de balanceamento.
+**Window > General > Test Runner > EditMode > Run All.** São 133 testes: fórmula de dano com os exemplos do GDD (135 e 29), regras R1–R14, cada regra da IA, afinidade e espectro, missões, HP da jornada, 2ª fase do guardião, roteiro, loja, save (inclusive a migração da versão 1) e a simulação de balanceamento.
 
 O teste `PrintBalanceReport` roda milhares de batalhas IA contra IA e mostra a matriz 9×9 de duelos, a duração média das batalhas e a jornada completa por afinidade (`CampaignSimulation`). Rode depois de mexer em atributos, habilidades, guardiões, missões ou perfis de IA.
 
-Situação da validação: o MVP abre e roda no Unity `6000.0.23f1` (conferido pelo time em 11/11/2026). `Core`, `Game` e os testes compilam e passam fora do Unity (132 de 132), e a camada `Presentation` é exercitada por um roteiro automático sobre uma simulação da API do Unity: abertura, escolha de afinidade, missão, Ato I, 2ª fase do Guardião do Núcleo, epílogo, contra IA com espectro, save e reset. As telas novas (afinidade e quadro de missões) ainda precisam ser vistas no editor. Ainda falta um build WebGL testado nos navegadores.
+Situação da validação: o MVP abre e roda no Unity `6000.0.23f1` (conferido pelo time em 11/11/2026). `Core`, `Game` e os testes compilam e passam fora do Unity (133 de 133), e a camada `Presentation` é exercitada por um roteiro automático sobre uma simulação da API do Unity: abertura, escolha de afinidade, missão, Ato I, 2ª fase do Guardião do Núcleo, epílogo, contra IA com espectro, save e reset. As telas novas (afinidade e quadro de missões) ainda precisam ser vistas no editor. Ainda falta um build WebGL testado nos navegadores.
 
 ## Pontos de extensão
 

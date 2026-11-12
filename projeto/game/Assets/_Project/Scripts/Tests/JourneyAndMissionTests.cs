@@ -391,6 +391,17 @@ namespace ComboTactics.Tests
         }
 
         [Test]
+        public void StoryVisualsMatchTheCutsceneKinds()
+        {
+            // A tela de cutscene converte StoryVisual para CutsceneVisualKind pelo número: a ordem precisa ser a mesma.
+            CollectionAssert.AreEqual(new[] { "GuardianConfrontation", "CrystalWhole", "CrystalShatter", "AffinityChoice", "SpectrumUnlock" },
+                Enum.GetNames(typeof(StoryVisual)));
+            Assert.AreEqual(StoryVisual.CrystalWhole, StoryScript.Prologue()[0].Visual);
+            Assert.AreEqual(StoryVisual.CrystalWhole, StoryScript.Finale()[0].Visual);
+            Assert.AreEqual(StoryVisual.SpectrumUnlock, StoryScript.AffinityChosen(Element.Fire, _game.Content)[0].Visual);
+        }
+
+        [Test]
         public void TheOwnElementGuardianSaysItBringsNobodyNew()
         {
             var own = StoryScript.Chapter(0, Element.Fire, _game.Content);
