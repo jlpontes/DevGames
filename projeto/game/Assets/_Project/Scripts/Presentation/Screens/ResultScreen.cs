@@ -28,6 +28,7 @@ namespace ComboTactics.UI
                 var frame = Ui.Frame(parent, "New" + i, startX + i * 120f, y + 22, 112, 58, Theme.Panel, Theme.ElementColor(def.Element), 1.5f);
                 Ui.Picture(frame, "Icon", Art.Fighter(def.Id, def.Element, def.Class), 4, 3, 50, 50);
                 Ui.Label(frame, def.Name.Replace(" de ", "\nde "), 54, 2, 56, 52, 10, Theme.Text, TextAnchor.MiddleLeft, FontStyle.Bold);
+                PopIn.On(frame.parent, 0.35f + i * 0.12f);
             }
         }
 
@@ -42,9 +43,20 @@ namespace ComboTactics.UI
             else if (_result.PlayerWon) { title = "VITÓRIA!"; color = Theme.Good; }
             else { title = "DERROTA"; color = Theme.Bad; }
 
+            // Anel de runas girando atrás do painel: o mesmo círculo das arenas, na cor do resultado.
+            var rune = Ui.Picture(Root, "ResultRune", Art.VfxRuneCircle, 0, 0, 620, 620);
+            Ui.PlaceCentered(rune.rectTransform, Theme.Width * 0.5f, 170f, 620f, 620f);
+            rune.color = Theme.WithAlpha(color, 0.16f);
+            rune.gameObject.AddComponent<Spinner>().DegreesPerSecond = 6f;
+            Ui.Shadow(Root, 210, 108, 860, 504);
             var panel = Ui.Frame(Root, "Panel", 210, 108, 860, 504, Theme.PanelLight, color, 3f);
-            Ui.Box(panel.transform, "HeaderGlow", 0, 0, 854, 104, new Color(color.r * 0.22f, color.g * 0.22f, color.b * 0.22f, 0.7f));
-            Ui.Label(panel.transform, title, 20, 14, 814, 76, 54, color, TextAnchor.MiddleCenter, FontStyle.Bold, true);
+            var glow = Ui.Picture(panel.transform, "HeaderGlow", Art.GradientUp, 0, 0, 854, 110);
+            glow.uvRect = new Rect(0f, 1f, 1f, -1f);
+            glow.color = new Color(color.r * 0.5f, color.g * 0.5f, color.b * 0.5f, 0.45f);
+            var titleLabel = Ui.Label(panel.transform, title, 20, 14, 814, 76, 54, color, TextAnchor.MiddleCenter, FontStyle.Bold, true);
+            titleLabel.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+            titleLabel.rectTransform.anchoredPosition = new Vector2(20f + 407f, -(14f + 38f));
+            PopIn.On(titleLabel, 0.12f, 1.4f);
 
             var rewardBox = Ui.Frame(panel.transform, "Reward", 90, 120, 674, 62, Theme.Panel, Theme.BorderGold, 1.5f);
             string detail = _match.Mode == GameMode.LocalPvp

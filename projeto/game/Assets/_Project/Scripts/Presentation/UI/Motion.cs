@@ -235,4 +235,52 @@ namespace ComboTactics.UI
             _owner = null;
         }
     }
+
+    /// <summary>Gira devagar (anéis de runas decorativos).</summary>
+    public sealed class Spinner : MonoBehaviour
+    {
+        public float DegreesPerSecond = 10f;
+        private float _angle;
+
+        private void Update()
+        {
+            _angle += DegreesPerSecond * Time.unscaledDeltaTime;
+            transform.localRotation = Quaternion.Euler(0f, 0f, _angle);
+        }
+    }
+
+    /// <summary>Entrada com "salto": cresce passando um pouco do tamanho e assenta. Aceita atraso para escalonar.</summary>
+    public sealed class PopIn : MonoBehaviour
+    {
+        private float _delay;
+        private float _from;
+        private float _t;
+        private CanvasGroup _group;
+
+        public static PopIn On(Component target, float delay = 0f, float from = 0.6f)
+        {
+            var pop = target.gameObject.AddComponent<PopIn>();
+            pop._delay = delay;
+            pop._from = from;
+            pop._group = target.gameObject.GetComponent<CanvasGroup>() ?? target.gameObject.AddComponent<CanvasGroup>();
+            pop._group.alpha = 0f;
+            pop.transform.localScale = new Vector3(from, from, 1f);
+            return pop;
+        }
+
+        private void Update()
+        {
+            if (_delay > 0f) { _delay -= Time.unscaledDeltaTime; return; }
+            _t += Time.unscaledDeltaTime / 0.32f;
+            float s = Mathf.LerpUnclamped(_from, 1f, Ease.OutBack(_t, 1.6f));
+            transform.localScale = new Vector3(s, s, 1f);
+            _group.alpha = Mathf.Clamp01(_t * 2.5f);
+            if (_t >= 1f)
+            {
+                transform.localScale = Vector3.one;
+                _group.alpha = 1f;
+                Destroy(this);
+            }
+        }
+    }
 }

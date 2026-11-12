@@ -1156,7 +1156,7 @@ namespace ComboTactics.UI
                 var card = Ui.Frame(strip, "ArenaCard" + a, cardX, 38, 260, 172, Theme.PanelLight, Theme.BorderSubtle, 2.5f);
                 cardFrames[a] = (RectTransform)card.parent;
                 cardBorders[a] = card.parent.GetComponent<Image>();
-                cardPics[a] = Ui.Picture(card, "Thumb", Art.Arena(arenaId), 8, 8, 240, 110);
+                cardPics[a] = Ui.ArenaPicture(card, "Thumb", arenaId, 8, 8, 240, 110);
                 cardNames[a] = Ui.Label(card, spec.Name.ToUpper(), 8, 120, 240, 24, 17, col, TextAnchor.MiddleCenter, FontStyle.Bold, true);
                 Ui.Label(card, Theme.ArenaEffect(spec, _engine.Rules), 6, 142, 244, 22, 11, Theme.Text, TextAnchor.MiddleCenter);
             }
@@ -1292,7 +1292,8 @@ namespace ComboTactics.UI
 
         private string Who(int side, int fighterIndex)
         {
-            return _view.Sides[side].Team[fighterIndex].Spec.Name + " (" + _match.SideNames[side] + ")";
+            string name = _view.Sides[side].Team[fighterIndex].Spec.Name;
+            return name == _match.SideNames[side] ? name : name + " (" + _match.SideNames[side] + ")";
         }
 
         private IEnumerator Tween(float seconds, Action<float> step)

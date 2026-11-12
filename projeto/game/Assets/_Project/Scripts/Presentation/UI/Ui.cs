@@ -147,6 +147,31 @@ namespace ComboTactics.UI
             return image;
         }
 
+        /// <summary>
+        /// Arte de arena (16:9) numa caixa de outra proporção: recorta o centro em vez de esticar, como "cover" no CSS.
+        /// </summary>
+        public static RawImage ArenaPicture(Transform parent, string name, ComboTactics.Core.ArenaId arena, float x, float y, float w, float h)
+        {
+            var image = Picture(parent, name, Art.Arena(arena), x, y, w, h);
+            Cover(image, w, h, 16f / 9f);
+            return image;
+        }
+
+        public static void Cover(RawImage image, float w, float h, float textureAspect)
+        {
+            float boxAspect = w / Mathf.Max(1f, h);
+            if (boxAspect > textureAspect)
+            {
+                float v = textureAspect / boxAspect;
+                image.uvRect = new Rect(0f, (1f - v) * 0.5f, 1f, v);
+            }
+            else
+            {
+                float u = boxAspect / textureAspect;
+                image.uvRect = new Rect((1f - u) * 0.5f, 0f, u, 1f);
+            }
+        }
+
         public static Text Label(Transform parent, string text, float x, float y, float w, float h, int size, Color color,
             TextAnchor anchor = TextAnchor.MiddleCenter, FontStyle style = FontStyle.Normal, bool outline = false)
         {

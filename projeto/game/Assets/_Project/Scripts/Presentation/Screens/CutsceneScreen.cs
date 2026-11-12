@@ -144,7 +144,7 @@ namespace ComboTactics.UI
                 : "Próxima cena";
             Ui.Button(storyPanel, nextLabel, 958, 108, 220, 68, OnAdvancePressed, Theme.ButtonPrimary, 20);
             Ui.Label(storyPanel, "[Espaço, Enter ou Clique]", 958, 182, 220, 22, 12, Theme.Muted, TextAnchor.MiddleCenter);
-            Ui.Label(storyPanel, "Afinidade do Mago: " + Theme.ElementName(playerAffinity),
+            Ui.Label(storyPanel, AffinityText(playerAffinity),
                 958, 206, 220, 20, 12, affinityColor, TextAnchor.MiddleCenter, FontStyle.Bold);
 
             // Véu de transição suave na entrada do slide
@@ -287,7 +287,7 @@ namespace ComboTactics.UI
                 Color zCol = Theme.ArenaColor(zoneArenas[i]);
 
                 var zCard = Ui.Frame(stage, "ZoneOrigin" + i, colX, rowY, 396, 140, new Color(0.06f, 0.05f, 0.10f, 0.95f), zCol, 2f);
-                Ui.Picture(zCard, "ArenaThumb", Art.Arena(zoneArenas[i]), 8, 8, 148, 120);
+                Ui.ArenaPicture(zCard, "ArenaThumb", zoneArenas[i], 8, 8, 148, 120);
                 Ui.Label(zCard, zoneTitles[i], 164, 10, 222, 24, 13, zCol, TextAnchor.MiddleLeft, FontStyle.Bold, true);
                 Ui.Label(zCard, zoneLore[i], 164, 38, 222, 54, 12, Theme.Text, TextAnchor.UpperLeft);
                 Ui.Label(zCard, i < 3 ? "Protegido pelo Guardião da Zona" : "Protegido pelo Guardião do Núcleo",
@@ -470,7 +470,7 @@ namespace ComboTactics.UI
             var summonerCard = Ui.Frame(stage, "SummonerFrame", x, y, 200, 232, new Color(0.08f, 0.05f, 0.14f, 0.95f), Theme.Gold, 2.5f);
             Ui.Picture(summonerCard, "SummonerArt", Art.Fighter(Art.SummonerId, Element.Neutral, CharClass.Mage), 22, 10, 152, 152);
             Ui.Label(summonerCard, CampaignStory.SummonerName.ToUpperInvariant() + " (VOCÊ)", 6, 166, 184, 22, 14, Theme.Gold, TextAnchor.MiddleCenter, FontStyle.Bold, true);
-            Ui.Label(summonerCard, "Afinidade: " + Theme.ElementName(CampaignStory.GetPlayerAffinity()),
+            Ui.Label(summonerCard, AffinityText(CampaignStory.GetPlayerAffinity()),
                 6, 190, 184, 22, 12, affinityColor, TextAnchor.MiddleCenter, FontStyle.Bold);
             animatedPortraits.Add((RectTransform)summonerCard.parent);
         }
@@ -549,6 +549,11 @@ namespace ComboTactics.UI
                 _index--;
                 Rebuild();
             }
+        }
+
+        private static string AffinityText(Element affinity)
+        {
+            return affinity == Element.Neutral ? "Afinidade a escolher" : "Afinidade: " + Theme.ElementName(affinity);
         }
 
         private void NextSlide()

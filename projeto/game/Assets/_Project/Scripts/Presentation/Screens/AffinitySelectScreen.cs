@@ -41,7 +41,7 @@ namespace ComboTactics.UI
                 selected ? new Color(color.r * 0.35f, color.g * 0.35f, color.b * 0.35f, 0.97f) : Theme.PanelLight,
                 selected ? Theme.Gold : color, selected ? 3f : 1.5f);
 
-            var arena = Ui.Picture(frame, "Arena", Art.Arena(StoryScript.HomeArena(element)), 8, 8, 372, 130);
+            var arena = Ui.ArenaPicture(frame, "Arena", StoryScript.HomeArena(element), 8, 8, 372, 130);
             arena.color = selected ? Color.white : new Color(0.7f, 0.7f, 0.75f, 1f);
             Ui.Label(frame, StoryScript.ElementTitle(element).ToUpperInvariant(), 8, 90, 372, 44, 34, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold, true);
 

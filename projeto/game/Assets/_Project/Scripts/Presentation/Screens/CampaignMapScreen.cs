@@ -56,7 +56,7 @@ namespace ComboTactics.UI
                 var card = Ui.Frame(Root, "Stage" + i, 36 + i * 304, 92, 292, 392,
                     isCurrent ? new Color(0.14f, 0.11f, 0.18f, 0.96f) : Theme.PanelLight, border, isCurrent ? 3f : 2f);
 
-                var picture = Ui.Picture(card, "Arena", Art.Arena(opponent.HomeArena), 10, 10, 268, 122);
+                var picture = Ui.ArenaPicture(card, "Arena", opponent.HomeArena, 10, 10, 268, 122);
                 if (!unlocked) picture.color = new Color(0.25f, 0.25f, 0.28f, 1f);
 
                 int count = opponent.TeamIds.Count;
