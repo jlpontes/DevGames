@@ -29,6 +29,9 @@ Para o build web: **File > Build Profiles > Web > Build**. O `ProjectSetup` já 
 | Modos | Campanha (4 fases), missões, contra IA (Fácil, Normal, Difícil), PvP local com "passe o aparelho" e Modo Justo (R6) |
 | Meta | Moedas (100 / 50 / 500), loja de itens, evoluções de +3% até 5 níveis, save local em dois slots |
 | Arte | Fundos de arena e menu do projeto; sprites dos 9 lutadores e do Boss em `Resources/Art/Characters`. Sem áudio |
+| Direção visual | "Relicário de Bronze e Cristal" ([ART-DIRECTION.md](ART-DIRECTION.md)): molduras 9-slice geradas em código, estados de hover/clique/desabilitado, dicas de mouse, avisos e transições de tela |
+| Animação de combate | Idle por classe, antecipação, hit-stop, flash de impacto, recuo, tremor e zoom proporcionais ao dano, faíscas, números de dano, desvio com imagens residuais, queda que se desfaz em partículas, invocação na troca, cut-in do especial |
+| HUD de batalha | Painéis de equipe, medalhão da arena com contagem do sorteio, placas com HP de rastro e efeitos em pips, cartas de golpe com dano, efetividade e atalhos (1, 2, 3, Q, E, Esc) |
 
 ## Estrutura
 

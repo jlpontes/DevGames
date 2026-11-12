@@ -15,6 +15,7 @@ Vários agentes trabalham neste repositório ao mesmo tempo. Estas regras evitam
 
 - **Save só pelo `ProfileService`.** Nada de chaves soltas no `PlayerPrefs`: elas escapam do save em dois slots, da migração de versão e do "Zerar progresso".
 - **História segue o Caderno (p.2, p.3, p.8) e o GDD (R9 a R14).** Texto novo entra no `StoryScript`; a tela só formata.
+- **Visual segue o `ART-DIRECTION.md`.** Cores, tamanhos de fonte e tempos vêm do `Theme`; caixas e botões, do `Ui.Frame`/`Ui.Button` (nada de retângulo com borda à mão); movimento, das curvas de `Ease`. Hit-stop e tremor têm teto: não aumente.
 - **A UI não decide regra.** Se a tela precisa de um número ou de uma condição (custo do Altar, quem está no espectro, se a missão foi cumprida), pergunte ao serviço (`Journey`, `Missions`, `Launcher`).
 - **Antes de commitar,** confira que nenhum arquivo de outro agente ficou no meio de uma mudança, e commite só os seus arquivos.
 - **Commits:** autor jlpontes, mensagem em inglês no imperativo, sem linha de coautoria.
